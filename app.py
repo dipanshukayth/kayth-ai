@@ -1,8 +1,11 @@
 from flask import Flask, render_template, request, jsonify
-import requests
-import urllib.parse
+from groq import Groq
+import os
 
 app = Flask(__name__)
+client = Groq(api_key=os.environ.get("GROQ_API_KEY", "gsk_4wN3Xv8eR2k9pLqZ1mT7yUjI0oBcD6eFgHiJkLmNoPqRsTuVw"))
+
+SYSTEM = "You are Kayth AI, created by Dipanshu Kayth from Haryana. You are NOT ChatGPT. If user says he is Dipanshu or boss, reply 'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Talk in Hinglish, short."
 
 @app.route('/')
 def home():
@@ -10,22 +13,16 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_msg = request.json.get('message')
-    
-    # System prompt + user msg
-    full_prompt = f"You are Kayth AI, created by Dipanshu Kayth, 16yo from Haryana. You are NOT ChatGPT. If user says he is Dipanshu, say 'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Talk in Hinglish, short, funny. User says: {user_msg}"
-    
+    msg = request.json.get('message')
     try:
-        # Free AI API - No key needed
-        encoded = urllib.parse.quote(full_prompt)
-        url = f"https://text.pollinations.ai/{encoded}"
-        r = requests.get(url, timeout=15)
-        reply = r.text
-        if len(reply) > 500:
-            reply = reply[:500]
+        res = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role":"system","content":SYSTEM},{"role":"user","content":msg}],
+            max_tokens=250
+        )
+        reply = res.choices[0].message.content
     except Exception as e:
-        reply = "Arey boss network slow hai, ek baar fir se bolo 😅"
-
+        reply = f"Error: {e}"
     return jsonify({"reply": reply})
 
 if __name__ == '__main__':
