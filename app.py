@@ -1,10 +1,8 @@
 from flask import Flask, render_template, request, jsonify
-from g4f.client import Client
+import requests
+import urllib.parse
 
 app = Flask(__name__)
-client = Client()
-
-SYSTEM_PROMPT = "You are Kayth AI, created by Dipanshu Kayth, 16yo from Haryana. You are NOT ChatGPT or Meta AI. If someone says he is Dipanshu, reply 'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Talk in Hinglish, short, funny, 1 emoji max."
 
 @app.route('/')
 def home():
@@ -13,17 +11,20 @@ def home():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message')
+    
+    # System prompt + user msg
+    full_prompt = f"You are Kayth AI, created by Dipanshu Kayth, 16yo from Haryana. You are NOT ChatGPT. If user says he is Dipanshu, say 'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Talk in Hinglish, short, funny. User says: {user_msg}"
+    
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg}
-            ],
-        )
-        reply = response.choices[0].message.content
-    except:
-        reply = "Arey thoda load hai boss, fir se puch 😅"
+        # Free AI API - No key needed
+        encoded = urllib.parse.quote(full_prompt)
+        url = f"https://text.pollinations.ai/{encoded}"
+        r = requests.get(url, timeout=15)
+        reply = r.text
+        if len(reply) > 500:
+            reply = reply[:500]
+    except Exception as e:
+        reply = "Arey boss network slow hai, ek baar fir se bolo 😅"
 
     return jsonify({"reply": reply})
 
