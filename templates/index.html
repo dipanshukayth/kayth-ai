@@ -1,42 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kayth AI</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{font-family:Arial;background:#0f0f0f;color:#fff;display:flex;justify-content:center;height:100vh;margin:0}
-.box{width:100%;max-width:500px;display:flex;flex-direction:column;padding:20px}
-h1{text-align:center;color:#00ff88}
-#chat{flex:1;overflow-y:auto;margin:20px 0;padding:10px;background:#1a1a1a;border-radius:10px}
-.msg{margin:10px 0;padding:10px;border-radius:8px}
-.user{background:#00ff88;color:#000;text-align:right}
-.bot{background:#2a2a2a}
-.input-box{display:flex;gap:10px}
-input{flex:1;padding:12px;border-radius:20px;border:none;outline:none}
-button{padding:12px 20px;border-radius:20px;border:none;background:#00ff88;font-weight:bold;cursor:pointer}
+body{background:#000;color:#fff;font-family:system-ui;margin:0;display:flex;flex-direction:column;height:100vh}
+.header{padding:15px;font-weight:bold;font-size:20px;background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;border-bottom:1px solid #222}
+#chat{flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:10px}
+.user{align-self:flex-end;background:linear-gradient(45deg,#feda75,#d62976);color:#fff;padding:10px 15px;border-radius:18px 18px 0 18px;max-width:75%}
+.ai{align-self:flex-start;background:#262626;padding:10px 15px;border-radius:18px 18px 18px 0;max-width:75%}
+.input-area{display:flex;padding:10px;background:#121212;gap:10px;border-top:1px solid #262626}
+input{flex:1;background:#262626;border:none;border-radius:20px;padding:12px 15px;color:#fff;outline:none}
+button{background:linear-gradient(45deg,#fa7e1e,#d62976);border:none;border-radius:50%;width:45px;height:45px;color:#fff;font-size:20px}
 </style>
 </head>
 <body>
-<div class="box">
-<h1>Kayth AI</h1>
+<div class="header">Kayth AI ✨</div>
 <div id="chat"></div>
-<div class="input-box">
-<input id="inp" placeholder="Ask anything...">
-<button onclick="send()">Send</button>
-</div>
+<div class="input-area">
+<input id="msg" placeholder="Message...">
+<button onclick="send()">↑</button>
 </div>
 <script>
 async function send(){
-  let inp=document.getElementById("inp");
-  let msg=inp.value;
-  if(!msg)return;
-  let chat=document.getElementById("chat");
-  chat.innerHTML+=`<div class="msg user">${msg}</div>`;
-  inp.value="";
-  let res=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
-  let data=await res.json();
-  chat.innerHTML+=`<div class="msg bot">${data.reply}</div>`;
-  chat.scrollTop=chat.scrollHeight;
+ let m=document.getElementById('msg').value;
+ if(!m)return;
+ let c=document.getElementById('chat');
+ c.innerHTML+=`<div class="user">${m}</div>`;
+ document.getElementById('msg').value='';
+ let r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+ let d=await r.json();
+ c.innerHTML+=`<div class="ai">${d.reply}</div>`;
+ c.scrollTop=c.scrollHeight;
 }
 </script>
 </body>
