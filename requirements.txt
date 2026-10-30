@@ -3,3 +3,5 @@ gunicorn
 groq
 flask
 g4f
+flask
+requests
