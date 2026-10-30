@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Kayth AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:Arial;background:#0f0f0f;color:#fff;display:flex;justify-content:center;height:100vh;margin:0}
+.box{width:100%;max-width:500px;display:flex;flex-direction:column;padding:20px}
+h1{text-align:center;color:#00ff88}
+#chat{flex:1;overflow-y:auto;margin:20px 0;padding:10px;background:#1a1a1a;border-radius:10px}
+.msg{margin:10px 0;padding:10px;border-radius:8px}
+.user{background:#00ff88;color:#000;text-align:right}
+.bot{background:#2a2a2a}
+.input-box{display:flex;gap:10px}
+input{flex:1;padding:12px;border-radius:20px;border:none;outline:none}
+button{padding:12px 20px;border-radius:20px;border:none;background:#00ff88;font-weight:bold;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>Kayth AI</h1>
+<div id="chat"></div>
+<div class="input-box">
+<input id="inp" placeholder="Ask anything...">
+<button onclick="send()">Send</button>
+</div>
+</div>
+<script>
+async function send(){
+  let inp=document.getElementById("inp");
+  let msg=inp.value;
+  if(!msg)return;
+  let chat=document.getElementById("chat");
+  chat.innerHTML+=`<div class="msg user">${msg}</div>`;
+  inp.value="";
+  let res=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
+  let data=await res.json();
+  chat.innerHTML+=`<div class="msg bot">${data.reply}</div>`;
+  chat.scrollTop=chat.scrollHeight;
+}
+</script>
+</body>
+</html>
