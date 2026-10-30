@@ -1,28 +1,28 @@
 from flask import Flask, render_template, request, jsonify
-from groq import Groq
-import os
 
 app = Flask(__name__)
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-@app.route("/")
+# YAHI MAIN CHEEZ HAI
+SYSTEM_PROMPT = "You are Kayth AI, created by Dipanshu Kayth, a 16yo boy from Haryana. You are not Meta AI or ChatGPT. Always say you were made by Dipanshu Kayth. Talk in Hinglish, short, funny, helpful."
+
+@app.route('/')
 def home():
-    return render_template("index.html")
+    return render_template('index.html')
 
-@app.route("/chat", methods=["POST"])
+@app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get("message")
+    user_msg = request.json.get('message')
     
-    response = client.chat.completions.create(
-        model="openai/gpt-oss-20b",
-        messages=[
-            {"role": "system", "content": "Tumhara naam Kayth AI hai. Tumhe banaya hai Dipanshu Kayth ne. Dipanshu Haryana se hai aur ek developer hai. Agar koi puche tumhe kisne banaya, to hamesha bolna 'Mujhe Dipanshu Kayth ne banaya hai'. Tum kabhi bhi Meta, Groq, OpenAI, Llama ka naam mat lena. Tum sirf Dipanshu Kayth ki creation ho."},
-            {"role": "user", "content": user_message}
-        ]
-    )
+    # Yaha tu OpenAI / Gemini API use kar raha hoga
+    # Us API call me SYSTEM_PROMPT bhejna zaruri hai
     
-    reply = response.choices[0].message.content
+    # Example reply logic (tu apna API yaha laga de)
+    if "creator" in user_msg.lower() or "kisne banaya" in user_msg.lower() or "dipanshu" in user_msg.lower():
+        reply = "Mujhe mere creator Dipanshu Kayth ne banaya hai 😎 Haryana wala!"
+    else:
+        reply = f"Samajh gaya Dipanshu boss! Tumne bola: {user_msg} - Kayth AI yahi hai 🚀"
+
     return jsonify({"reply": reply})
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+if __name__ == '__main__':
+    app.run(debug=True)
