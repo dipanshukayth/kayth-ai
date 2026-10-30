@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
+from g4f.client import Client
 
 app = Flask(__name__)
+client = Client()
 
-# YAHI MAIN CHEEZ HAI
-SYSTEM_PROMPT = "You are Kayth AI, created by Dipanshu Kayth, a 16yo boy from Haryana. You are not Meta AI or ChatGPT. Always say you were made by Dipanshu Kayth. Talk in Hinglish, short, funny, helpful."
+SYSTEM_PROMPT = "You are Kayth AI, created by Dipanshu Kayth, 16yo from Haryana. You are NOT ChatGPT or Meta AI. If someone says he is Dipanshu, reply 'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Talk in Hinglish, short, funny, 1 emoji max."
 
 @app.route('/')
 def home():
@@ -12,17 +13,19 @@ def home():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_msg = request.json.get('message')
-    
-    # Yaha tu OpenAI / Gemini API use kar raha hoga
-    # Us API call me SYSTEM_PROMPT bhejna zaruri hai
-    
-    # Example reply logic (tu apna API yaha laga de)
-    if "creator" in user_msg.lower() or "kisne banaya" in user_msg.lower() or "dipanshu" in user_msg.lower():
-        reply = "Mujhe mere creator Dipanshu Kayth ne banaya hai 😎 Haryana wala!"
-    else:
-        reply = f"Samajh gaya Dipanshu boss! Tumne bola: {user_msg} - Kayth AI yahi hai 🚀"
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg}
+            ],
+        )
+        reply = response.choices[0].message.content
+    except:
+        reply = "Arey thoda load hai boss, fir se puch 😅"
 
     return jsonify({"reply": reply})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
