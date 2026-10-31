@@ -1,4 +1,5 @@
 import os
+import re
 import random
 
 from flask import Flask, render_template, request, jsonify
@@ -6,9 +7,21 @@ from groq import Groq, RateLimitError
 
 app = Flask(__name__)
 
-MODEL = "llama-3.1-8b-instant"
-API_KEY = os.environ.get("GROQ_API_KEY")
+
+def env(name, default=""):
+    # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
+    return os.environ.get(name, default).strip().strip("'\"").strip()
+
+
+API_KEY = env("GROQ_API_KEY")
 client = Groq(api_key=API_KEY) if API_KEY else None
+
+# llama-3.1-8b-instant Groq ne 16 Aug 2026 ko band kar diya.
+# Replacement: openai/gpt-oss-20b. Pehla fail ho to agla try hota hai.
+_models = [env("GROQ_MODEL"), "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
+# Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
+VISION_MODEL = env("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
 
 SYSTEM_PROMPT = (
     "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Siwani, Haryana. "
@@ -28,6 +41,7 @@ FALLBACKS = [
 ]
 RATE_LIMIT_REPLY = "Bohot log mujhse baat kar rahe hain 😭 thoda ruk ke bhej, abhi line lambi hai!"
 NO_KEY_REPLY = "Boss ne meri API key lagayi hi nahi 😂 admin se bolo GROQ_API_KEY set kare!"
+BAD_IMAGE_REPLY = "Ye photo thodi badi ya galat lag rahi hai 😅 chhoti photo bhej!"
 
 
 def clean_history(history):
@@ -45,6 +59,30 @@ def clean_history(history):
     return out
 
 
+def clean_output(text):
+    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
+    return text.strip()
+
+
+def complete(models, messages):
+    """Models ko ek ek karke try karta hai, pehla jo chale uska reply deta hai."""
+    last = None
+    for model in models:
+        try:
+            kwargs = dict(model=model, messages=messages, max_tokens=800, temperature=0.8)
+            if model.startswith("openai/gpt-oss"):
+                kwargs["extra_body"] = {"reasoning_effort": "low"}
+            resp = client.chat.completions.create(**kwargs)
+            text = clean_output(resp.choices[0].message.content)
+            if text:
+                return text
+            last = ValueError("empty reply from " + model)
+        except Exception as e:
+            app.logger.warning("Model %s failed: %s: %s", model, type(e).__name__, e)
+            last = e
+    raise last or RuntimeError("no model configured")
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -55,42 +93,76 @@ def health():
     return "ok", 200
 
 
+@app.route("/debug")
+def debug():
+    """Browser me kholo: kayth-ai-2.onrender.com/debug. Kaam hone ke baad hata dena."""
+    lines = [
+        "GROQ_API_KEY set: %s" % bool(API_KEY),
+        "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
+        "Key length: %d" % len(API_KEY),
+        "Text models: %s" % ", ".join(TEXT_MODELS),
+        "Vision model: %s" % VISION_MODEL,
+        "",
+    ]
+    if client is None:
+        lines.append("Client nahi bana: GROQ_API_KEY Render me set karo.")
+        return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    for model in TEXT_MODELS + [VISION_MODEL]:
+        try:
+            r = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "Say hi in 3 words"}],
+                max_tokens=200,
+            )
+            lines.append("OK   %s -> %s" % (model, clean_output(r.choices[0].message.content)[:60]))
+        except Exception as e:
+            lines.append("FAIL %s -> %s: %s" % (model, type(e).__name__, str(e)[:200]))
+    return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
-    if not isinstance(message, str) or not message.strip():
-        return jsonify({"reply": "Kuch likh to sahi bhai 😅"}), 400
-    message = message.strip()[:1000]
+    image = data.get("image")
+    message = message.strip()[:1000] if isinstance(message, str) else ""
 
-    if message.lower().rstrip("!. ") in BOSS_TRIGGERS:
+    if image is not None:
+        if not (isinstance(image, str) and image.startswith("data:image/") and len(image) < 6_000_000):
+            return jsonify({"reply": BAD_IMAGE_REPLY}), 400
+        if not message:
+            message = "Is photo mein kya hai? Batao."
+    elif not message:
+        return jsonify({"reply": "Kuch likh to sahi bhai 😅"}), 400
+
+    if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
         return jsonify({"reply": BOSS_REPLY})
 
     if client is None:
-        return jsonify({"reply": NO_KEY_REPLY, "fallback": True})
+        return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
 
-    messages = (
-        [{"role": "system", "content": SYSTEM_PROMPT}]
-        + clean_history(data.get("history"))
-        + [{"role": "user", "content": message}]
-    )
+    if image:
+        user_msg = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": message},
+                {"type": "image_url", "image_url": {"url": image}},
+            ],
+        }
+        models = [VISION_MODEL]
+    else:
+        user_msg = {"role": "user", "content": message}
+        models = TEXT_MODELS
+
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
 
     try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            max_tokens=200,
-            temperature=0.8,
-        )
-        reply = (resp.choices[0].message.content or "").strip()
-        if not reply:
-            raise ValueError("empty reply")
-        return jsonify({"reply": reply})
+        return jsonify({"reply": complete(models, messages)})
     except RateLimitError:
-        return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True})
-    except Exception:
+        return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
+    except Exception as e:
         app.logger.exception("Groq call failed")
-        return jsonify({"reply": random.choice(FALLBACKS), "fallback": True})
+        return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
 
 
 if __name__ == "__main__":
