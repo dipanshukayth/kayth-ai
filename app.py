@@ -2,27 +2,33 @@ import os
 import re
 import random
 from urllib.parse import quote
+
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from groq import Groq, RateLimitError
 
+import store
+
 app = Flask(__name__)
 
-@app.route('/manifest.json')
-def manifest():
-    return send_from_directory('static', 'manifest.json')
+try:
+    store.init()
+except Exception:
+    app.logger.exception("Database init fail (limit/refer band rahega, chat chalti rahegi)")
 
-@app.route('/sw.js')
-def service_worker():
-    return send_from_directory('static', 'sw.js')
 
 def env(name, default=""):
+    # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
     return os.environ.get(name, default).strip().strip("'\"").strip()
+
 
 API_KEY = env("GROQ_API_KEY")
 client = Groq(api_key=API_KEY) if API_KEY else None
 
+# llama-3.1-8b-instant Groq ne 16 Aug 2026 ko band kar diya.
+# Replacement: openai/gpt-oss-20b. Pehla fail ho to agla try hota hai.
 _models = [env("GROQ_MODEL"), "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
 TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
+# Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
 VISION_MODEL = env("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
 
 SYSTEM_PROMPT = (
@@ -43,7 +49,9 @@ FALLBACKS = [
 ]
 RATE_LIMIT_REPLY = "Bohot log mujhse baat kar rahe hain 😭 thoda ruk ke bhej, abhi line lambi hai!"
 NO_KEY_REPLY = "Boss ne meri API key lagayi hi nahi 😂 admin se bolo GROQ_API_KEY set kare!"
+LIMIT_REPLY = "Aaj ke free messages khatam 😅 kal phir aa, ya dost ko refer karke extra messages kama le 🎁"
 BAD_IMAGE_REPLY = "Ye photo thodi badi ya galat lag rahi hai 😅 chhoti photo bhej!"
+
 
 def clean_history(history):
     out = []
@@ -59,11 +67,14 @@ def clean_history(history):
             out.append({"role": m["role"], "content": m["content"][:1000]})
     return out
 
+
 def clean_output(text):
     text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
     return text.strip()
 
+
 def complete(models, messages):
+    """Models ko ek ek karke try karta hai, pehla jo chale uska reply deta hai."""
     last = None
     for model in models:
         try:
@@ -80,6 +91,7 @@ def complete(models, messages):
             last = e
     raise last or RuntimeError("no model configured")
 
+
 def file_note(f):
     name = str(f.get("name", ""))[:80]
     text = f.get("text") if isinstance(f.get("text"), str) else ""
@@ -90,9 +102,55 @@ def file_note(f):
         "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
     )
 
+
+def client_ip():
+    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or ""
+
+
+def charge():
+    """(allowed, uid, source, left). Database kharab ho to user ko rokte nahi."""
+    uid = request.headers.get("X-Uid", "")
+    if not store.valid_uid(uid):
+        return True, None, None, None
+    try:
+        ok, src, left = store.consume(uid, client_ip())
+        return ok, uid, src, left
+    except Exception:
+        app.logger.exception("charge failed")
+        return True, None, None, None
+
+
+def give_back(uid, src, left):
+    """Groq fail hua to message wapas kar do."""
+    if not uid or not src:
+        return left
+    try:
+        store.refund(uid, src)
+        return None if left is None else left + 1
+    except Exception:
+        app.logger.exception("refund failed")
+        return left
+
+
+@app.route("/api/join", methods=["POST"])
+def api_join():
+    uid = request.headers.get("X-Uid", "")
+    if not store.valid_uid(uid):
+        return jsonify({"error": "bad uid"}), 400
+    data = request.get_json(silent=True) or {}
+    try:
+        m, credited = store.join(uid, str(data.get("ref", ""))[:20], client_ip())
+    except Exception:
+        app.logger.exception("join failed")
+        return jsonify({"error": "db"}), 503
+    m["credited"] = credited
+    return jsonify(m)
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 IMAGE_SYSTEM = (
     "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
@@ -104,6 +162,7 @@ IMAGE_REFUSE = [
     "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
 ]
 
+
 @app.route("/image", methods=["POST"])
 def image():
     data = request.get_json(silent=True) or {}
@@ -111,6 +170,11 @@ def image():
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
+
+    ok, uid, src, left = charge()
+    if not ok:
+        return jsonify({"reply": LIMIT_REPLY, "limit": True, "left": 0})
+
     prompt = message
     if client is not None:
         try:
@@ -120,21 +184,37 @@ def image():
             )
         except Exception:
             app.logger.exception("Image prompt rewrite failed")
+
     prompt = " ".join(prompt.split()).strip("\"'")[:300]
     if not prompt or prompt.upper().startswith("REFUSE"):
-        return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
+        return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True, "left": give_back(uid, src, left)})
+
+    # Pollinations ka free endpoint: browser seedha image load karta hai
     url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
         quote(prompt, safe=""),
         random.randint(1, 999999),
     )
-    return jsonify({"url": url, "prompt": prompt})
+    return jsonify({"url": url, "prompt": prompt, "left": left})
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    return send_from_directory(app.static_folder, "manifest.webmanifest", mimetype="application/manifest+json")
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
+
 
 @app.route("/health")
 def health():
     return "ok", 200
 
+
 @app.route("/debug")
 def debug():
+    """Browser me kholo: kayth-ai-2.onrender.com/debug. Kaam hone ke baad hata dena."""
     lines = [
         "GROQ_API_KEY set: %s" % bool(API_KEY),
         "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
@@ -158,6 +238,7 @@ def debug():
             lines.append("FAIL %s -> %s: %s" % (model, type(e).__name__, str(e)[:200]))
     return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
@@ -165,6 +246,7 @@ def chat():
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
     message = message.strip()[:1000] if isinstance(message, str) else ""
+
     if image is not None:
         if not (isinstance(image, str) and image.startswith("data:image/") and len(image) < 6_000_000):
             return jsonify({"reply": BAD_IMAGE_REPLY}), 400
@@ -174,10 +256,13 @@ def chat():
         return jsonify({"reply": "Kuch likh to sahi bhai 😅"}), 400
     if file and not message:
         message = "Is file mein kya hai? Short mein batao."
+
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
         return jsonify({"reply": BOSS_REPLY})
+
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
+
     if image:
         user_msg = {
             "role": "user",
@@ -190,14 +275,21 @@ def chat():
     else:
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
+
+    ok, uid, src, left = charge()
+    if not ok:
+        return jsonify({"reply": LIMIT_REPLY, "limit": True, "left": 0})
+
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
+
     try:
-        return jsonify({"reply": complete(models, messages)})
+        return jsonify({"reply": complete(models, messages), "left": left})
     except RateLimitError:
-        return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
+        return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError", "left": give_back(uid, src, left)})
     except Exception as e:
         app.logger.exception("Groq call failed")
-        return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
+        return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__, "left": give_back(uid, src, left)})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
