@@ -1,10 +1,9 @@
 import os
-import re
-import random
-from urllib.parse import quote
-from flask import send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from groq import Groq, RateLimitError
 
 app = Flask(__name__)
+
 @app.route('/manifest.json')
 def manifest():
     return send_from_directory('static', 'manifest.json')
@@ -12,13 +11,16 @@ def manifest():
 @app.route('/sw.js')
 def service_worker():
     return send_from_directory('static', 'sw.js')
-from flask import Flask, render_template, request, jsonify
-from groq import Groq, RateLimitError
-
 
 def env(name, default=""):
-    # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
     return os.environ.get(name, default).strip().strip("'\"").strip()
+
+API_KEY = env("GROQ_API_KEY")
+client = Groq(api_key=API_KEY) if API_KEY else None
+
+_models = [env("GROQ_MODEL"), "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
+
 
 
 API_KEY = env("GROQ_API_KEY")
