@@ -1,6 +1,7 @@
 import os
 import re
 import random
+from urllib.parse import quote
 
 from flask import Flask, render_template, request, jsonify
 from groq import Groq, RateLimitError
@@ -97,6 +98,47 @@ def file_note(f):
 @app.route("/")
 def home():
     return render_template("index.html")
+
+
+IMAGE_SYSTEM = (
+    "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
+    "(subject, style, lighting, mood). Output ONLY the prompt, no quotes, no extra words. "
+    "If the request is sexual, gory/violent, or depicts a real named person, output exactly: REFUSE"
+)
+IMAGE_REFUSE = [
+    "Ye wali image main nahi bana sakta bhai 🙅 kuch aur try kar!",
+    "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
+]
+
+
+@app.route("/image", methods=["POST"])
+def image():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message")
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
+    message = message.strip()[:500]
+
+    prompt = message
+    if client is not None:
+        try:
+            prompt = complete(
+                TEXT_MODELS,
+                [{"role": "system", "content": IMAGE_SYSTEM}, {"role": "user", "content": message}],
+            )
+        except Exception:
+            app.logger.exception("Image prompt rewrite failed")
+
+    prompt = " ".join(prompt.split()).strip("\"'")[:300]
+    if not prompt or prompt.upper().startswith("REFUSE"):
+        return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
+
+    # Pollinations ka free endpoint: browser seedha image load karta hai
+    url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
+        quote(prompt, safe=""),
+        random.randint(1, 999999),
+    )
+    return jsonify({"url": url, "prompt": prompt})
 
 
 @app.route("/health")
