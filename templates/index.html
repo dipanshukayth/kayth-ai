@@ -111,6 +111,10 @@ aside.open{transform:none}
 .sf button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;border-radius:12px;color:#c7c7cc;font-size:14px;text-align:left}
 .sf button:active{background:#1c1c1e}
 .sf .danger{color:#ff6b75}
+.pname{display:none;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;padding:0 4px}
+.prev.isfile img{display:none}
+.prev.isfile .pname{display:block}
+.fl{display:block;width:max-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.18);border-radius:10px;padding:6px 10px;margin-bottom:6px;font-size:13.5px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 @keyframes pulse{50%{opacity:.35}}
@@ -134,10 +138,10 @@ aside.open{transform:none}
   </main>
 
   <footer id="foot">
-    <div class="prev" id="prev"><img id="pimg" alt="Chuni hui photo"><button id="prem" aria-label="Photo hatao"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <input type="file" id="file" accept="image/*" hidden>
+    <div class="prev" id="prev"><img id="pimg" alt="Chuni hui photo"><span class="pname" id="pname"></span><button id="prem" aria-label="Photo hatao"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <input type="file" id="file" hidden>
     <div class="pill">
-      <button class="ic" id="gal" aria-label="Gallery"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg></button>
+      <button class="ic" id="gal" aria-label="File attach karo"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
       <input id="msg" type="text" placeholder="Message bhejo..." autocomplete="off" enterkeyhint="send" maxlength="1000">
       <div class="recbar" id="recbar"><i></i><span id="rt">Sun raha hu...</span></div>
     </div>
@@ -180,7 +184,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const newChatObj = () => ({ id: uid(), title: 'New chat', t: Date.now(), custom: false, msgs: [] });
 const titleFrom = msgs => {
   const u = msgs.find(m => m.r === 'user'); if (!u) return '';
-  const s = (u.c || '').trim() || '📷 Photo';
+  const s = (u.c || '').trim() || (u.f ? '📎 ' + u.f.name : '📷 Photo');
   return s.length > 32 ? s.slice(0, 32) + '…' : s;
 };
 let store = null;
@@ -193,7 +197,7 @@ if (!store || !Array.isArray(store.chats) || !store.chats.length) {
 }
 const cur = () => store.chats.find(c => c.id === store.active) || store.chats[0];
 store.active = cur().id;
-let chat = cur().msgs, busy = false, pendingImg = null, quiet = false;
+let chat = cur().msgs, busy = false, pendingImg = null, pendingFile = null, quiet = false;
 const persist = () => { try { localStorage.setItem(SKEY, JSON.stringify({ active: store.active, chats: store.chats.map(c => ({ ...c, msgs: c.msgs.slice(-200).map(({ img, ...m }) => m) })) })); } catch (e) {} };
 const save = () => { const c = cur(); if (c.msgs.some(m => m.r === 'user')) { c.t = Date.now(); if (!c.custom) c.title = titleFrom(c.msgs); } persist(); };
 const clock = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -218,6 +222,7 @@ function add(m, state) {
     if (m.img) { const im = document.createElement('img'); im.src = m.img; im.alt = 'Photo'; b.append(im); }
     else if (!m.c) t.textContent = '📷 Photo';
   }
+  if (m.f) { const fl = document.createElement('div'); fl.className = 'fl'; fl.textContent = '📎 ' + m.f.name; b.append(fl); }
   b.append(t, meta);
   let tk = null;
   if (ai) {
@@ -249,11 +254,11 @@ function showTyping(on) {
 /* ---------- send ---------- */
 async function send(text) {
   text = (text || '').trim();
-  const image = pendingImg;
-  if ((!text && !image) || busy) return;
+  const image = pendingImg, att = pendingFile;
+  if ((!text && !image && !att) || busy) return;
   busy = true; msg.value = ''; clearImg(); stopSpeak();
-  const history = chat.slice(-10).map(m => ({ role: m.r, content: m.c || (m.p ? '[photo bheji]' : '') })).filter(m => m.content);
-  const um = { r: 'user', c: text, t: Date.now(), p: !!image, img: image };
+  const history = chat.slice(-10).map(m => ({ role: m.r, content: ((m.c || '') + (m.p ? ' [photo bheji]' : '') + (m.f ? ' [file bheji: ' + m.f.name + ']' : '')).trim() })).filter(m => m.content);
+  const um = { r: 'user', c: text, t: Date.now(), p: !!image, img: image, f: att ? { name: att.name, size: att.size } : undefined };
   chat.push(um); const tk = add(um, 'sent'); save();
   setTimeout(() => setTicks(tk, 'delivered'), 350);
   showTyping(true);
@@ -261,7 +266,7 @@ async function send(text) {
 
   let reply = '';
   try {
-    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, history, image }) });
+    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, history, image, file: att }) });
     const d = await res.json(); reply = d.reply || '';
     if (d.err) console.warn('Kayth AI error:', d.err);
   } catch (e) {}
@@ -274,7 +279,7 @@ async function send(text) {
 
 msg.addEventListener('input', sync);
 msg.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(msg.value); } });
-function sync() { foot.classList.toggle('has', !!msg.value.trim() || !!pendingImg); }
+function sync() { foot.classList.toggle('has', !!msg.value.trim() || !!pendingImg || !!pendingFile); }
 
 /* ---------- text to speech ---------- */
 function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
@@ -332,7 +337,7 @@ function stopRec() {
 }
 
 act.addEventListener('pointerdown', e => {
-  if (msg.value.trim() || pendingImg) return;
+  if (msg.value.trim() || pendingImg || pendingFile) return;
   e.preventDefault(); act.setPointerCapture(e.pointerId); startRec(e.clientX);
 });
 act.addEventListener('pointermove', e => {
@@ -345,27 +350,65 @@ act.addEventListener('pointermove', e => {
 act.addEventListener('pointerup', stopRec);
 act.addEventListener('pointercancel', stopRec);
 act.addEventListener('contextmenu', e => e.preventDefault());
-act.addEventListener('click', () => { if (msg.value.trim() || pendingImg) send(msg.value); });
+act.addEventListener('click', () => { if (msg.value.trim() || pendingImg || pendingFile) send(msg.value); });
 
 /* ---------- misc ---------- */
-const file = $('#file'), prev = $('#prev'), pimg = $('#pimg');
-function clearImg() { pendingImg = null; prev.classList.remove('show'); file.value = ''; sync(); }
+const fileIn = $('#file'), prev = $('#prev'), pimg = $('#pimg'), pname = $('#pname');
+const MAX_FILE = 10 * 1024 * 1024;
+const isTextFile = f => f.type.startsWith('text/') || ['application/json', 'application/xml', 'application/javascript'].includes(f.type) ||
+  /\.(txt|md|csv|tsv|json|xml|html?|css|jsx?|tsx?|py|java|c|cpp|h|cs|go|rs|rb|php|sql|sh|ya?ml|toml|ini|log|tex)$/i.test(f.name);
+const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+function clearImg() { pendingImg = null; pendingFile = null; prev.classList.remove('show', 'isfile'); fileIn.value = ''; sync(); }
 $('#prem').addEventListener('click', clearImg);
-$('#gal').addEventListener('click', () => file.click());
-file.addEventListener('change', () => {
-  const f = file.files[0]; if (!f) return;
-  if (!f.type.startsWith('image/')) return toast('Sirf photo choose karo 📸');
-  const img = new Image(), url = URL.createObjectURL(f);
-  img.onload = () => {
-    const sc = Math.min(1, 1024 / Math.max(img.width, img.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    pendingImg = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url);
-    pimg.src = pendingImg; prev.classList.add('show'); sync(); msg.focus();
-  };
-  img.onerror = () => { URL.revokeObjectURL(url); toast('Ye photo khul nahi payi 😅'); };
-  img.src = url;
+$('#gal').addEventListener('click', () => fileIn.click());
+
+let pdfLib = null;
+function loadPdf() {
+  return pdfLib || (pdfLib = new Promise((ok, no) => {
+    const v = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    const sc = document.createElement('script'); sc.src = v + 'pdf.min.js';
+    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = v + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+    sc.onerror = () => { pdfLib = null; no(new Error('pdf.js load fail')); };
+    document.head.append(sc);
+  }));
+}
+async function pdfText(f) {
+  const lib = await loadPdf();
+  const pdf = await lib.getDocument({ data: await f.arrayBuffer() }).promise;
+  let out = '';
+  for (let i = 1; i <= Math.min(pdf.numPages, 30) && out.length < 14000; i++) {
+    const tc = await (await pdf.getPage(i)).getTextContent();
+    out += tc.items.map(x => x.str).join(' ') + '\n';
+  }
+  return out;
+}
+
+fileIn.addEventListener('change', async () => {
+  const f = fileIn.files[0]; if (!f) return;
+  if (f.size > MAX_FILE) { fileIn.value = ''; return toast('File 10 MB se chhoti honi chahiye'); }
+  if (f.type.startsWith('image/')) {
+    const img = new Image(), url = URL.createObjectURL(f);
+    img.onload = () => {
+      const sc = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      pendingFile = null; pendingImg = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url);
+      pimg.src = pendingImg; prev.classList.remove('isfile'); prev.classList.add('show'); sync(); msg.focus();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('Ye photo khul nahi payi 😅'); };
+    img.src = url; return;
+  }
+  let text = '';
+  try {
+    if (isTextFile(f)) text = await f.text();
+    else if (isPdf(f)) { toast('PDF padh raha hu...'); text = await pdfText(f); }
+  } catch (e) {}
+  text = text.trim().slice(0, 12000);
+  pendingImg = null;
+  pendingFile = { name: f.name.slice(0, 80), type: f.type || 'unknown', size: f.size, text };
+  pname.textContent = '📎 ' + f.name; prev.classList.add('show', 'isfile'); sync(); msg.focus();
+  if (!text) toast('Is file ka content padh nahi paunga, sirf naam jayega');
 });
 const ICON_EDIT = '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/></svg>';
 const ICON_DEL = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
@@ -373,7 +416,7 @@ const side = $('#side'), scrim = $('#scrim'), qEl = $('#q'), box = $('#chats');
 const guardBusy = () => { if (busy) { toast('Pehle reply aane do, phir chat badlo ⏳'); return true; } return false; };
 const snip = c => {
   if (!c.msgs.some(m => m.r === 'user')) return 'Abhi kuch nahi bheja';
-  const m = [...c.msgs].reverse().find(x => x.c); if (!m) return '📷 Photo';
+  const m = [...c.msgs].reverse().find(x => x.c); if (!m) { const l = [...c.msgs].reverse().find(x => x.f); return l ? '📎 ' + l.f.name : '📷 Photo'; }
   return m.c.length > 38 ? m.c.slice(0, 38) + '…' : m.c;
 };
 
@@ -460,7 +503,7 @@ $('#delall').addEventListener('click', () => {
 
 $('#export').addEventListener('click', () => {
   if (!chat.length) return toast('Export karne ko kuch nahi hai');
-  const text = chat.map(m => '[' + clock(m.t) + '] ' + (m.r === 'user' ? 'Tum' : 'Kayth AI') + ': ' + (m.c || '📷 Photo')).join('\n\n');
+  const text = chat.map(m => '[' + clock(m.t) + '] ' + (m.r === 'user' ? 'Tum' : 'Kayth AI') + ': ' + (m.c || (m.f ? '📎 ' + m.f.name : '📷 Photo'))).join('\n\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   a.download = (cur().title.replace(/[^\w\- ]+/g, '').trim().slice(0, 30) || 'kayth-chat') + '.txt';
