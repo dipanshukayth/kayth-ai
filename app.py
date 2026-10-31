@@ -3,7 +3,7 @@ import re
 import random
 from urllib.parse import quote
 
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 from groq import Groq, RateLimitError
 
 import store
@@ -195,16 +195,6 @@ def image():
         random.randint(1, 999999),
     )
     return jsonify({"url": url, "prompt": prompt, "left": left})
-
-
-@app.route("/manifest.webmanifest")
-def manifest():
-    return send_from_directory(app.static_folder, "manifest.webmanifest", mimetype="application/manifest+json")
-
-
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/x-icon")
 
 
 @app.route("/health")
