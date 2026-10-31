@@ -18,7 +18,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 .app{width:100%;max-width:720px;height:100%;height:100dvh;display:flex;flex-direction:column;border-inline:1px solid #151515}
 
 /* header */
-header{display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid #1a1a1a}
+header{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;border-bottom:1px solid #1a1a1a}
 .story{position:relative;width:46px;height:46px;flex:none}
 .ring{position:absolute;inset:0;border-radius:50%;overflow:hidden}
 .ring::before{content:"";position:absolute;inset:-50%;background:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
@@ -85,6 +85,32 @@ footer.has #act .snd{display:block}
 .prev button{width:26px;height:26px;border-radius:50%;background:#2a2a2e;display:grid;place-items:center}
 .prev button .i{width:14px;height:14px}
 .b img{display:block;max-width:100%;max-height:260px;border-radius:12px;margin-bottom:6px}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.scrim.show{opacity:1;pointer-events:auto}
+aside{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);background:#0c0c0f;border-right:1px solid #1d1d20;z-index:21;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .22s ease;padding:calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom))}
+aside.open{transform:none}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sh b{font-size:20px;font-weight:800;letter-spacing:-.3px;padding-left:4px}
+.newbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:99px;background:var(--y);color:#000;font-weight:700;font-size:15.5px}
+.sq{width:100%;height:40px;border-radius:99px;background:var(--card);border:1px solid #232327;color:#fff;font:inherit;font-size:15px;padding:0 14px;margin:10px 0 8px}
+.sq::placeholder{color:#6e6e73}
+#chats{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#222 transparent}
+.ci{display:flex;align-items:center;border-radius:14px;margin-bottom:2px}
+.ci:hover,.ci.on{background:#18181c}
+.ci.on .co b{color:var(--y)}
+.co{flex:1;min-width:0;text-align:left;padding:10px 8px 10px 12px}
+.co b,.co small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.co b{font-size:14.5px;font-weight:600}
+.co small{font-size:12px;color:var(--mut);margin-top:2px}
+.ca{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#8e8e93;flex:none}
+.ca:hover,.ca:focus-visible{color:#fff;background:#26262b}
+.ca.del:hover{color:#ff6b75}
+.ca .i{width:17px;height:17px}
+.empty{color:var(--mut);font-size:14px;text-align:center;padding:24px 0}
+.sf{border-top:1px solid #1d1d20;padding-top:8px;margin-top:6px}
+.sf button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;border-radius:12px;color:#c7c7cc;font-size:14px;text-align:left}
+.sf button:active{background:#1c1c1e}
+.sf .danger{color:#ff6b75}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 @keyframes pulse{50%{opacity:.35}}
@@ -95,8 +121,10 @@ footer.has #act .snd{display:block}
 <body>
 <div class="app">
   <header>
+    <button class="hbtn" id="menu" aria-label="Chats kholo"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
     <div class="story"><div class="ring"></div><div class="av">K</div><i class="dot" title="Online"></i></div>
     <div class="who"><b>Kayth AI 👻</b><small id="sub">online</small></div>
+    <button class="hbtn" id="newh" aria-label="Nayi chat"><svg class="i" viewBox="0 0 24 24"><path d="M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
     <button class="hbtn" id="clear" aria-label="Clear chat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
   </header>
 
@@ -119,6 +147,17 @@ footer.has #act .snd{display:block}
     </button>
   </footer>
 </div>
+<div class="scrim" id="scrim"></div>
+<aside id="side" aria-label="Chats" inert>
+  <div class="sh"><b>Chats</b><button class="hbtn" id="sclose" aria-label="Band karo"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <button class="newbtn" id="newc"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+  <input id="q" class="sq" type="search" placeholder="Chats dhundho..." autocomplete="off">
+  <div id="chats"></div>
+  <div class="sf">
+    <button id="export"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Is chat ko export karo</button>
+    <button id="delall" class="danger"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Saari chats delete karo</button>
+  </div>
+</aside>
 <div id="toast" role="status"></div>
 
 <script>
@@ -136,9 +175,27 @@ const OFFLINE = [
 ];
 const WELCOME = 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai?';
 
-let chat = [], busy = false, pendingImg = null;
-try { chat = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { chat = []; }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(chat.slice(-200).map(({ img, ...m }) => m))); } catch (e) {} };
+const SKEY = 'kayth_chats_v2';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const newChatObj = () => ({ id: uid(), title: 'New chat', t: Date.now(), custom: false, msgs: [] });
+const titleFrom = msgs => {
+  const u = msgs.find(m => m.r === 'user'); if (!u) return '';
+  const s = (u.c || '').trim() || '📷 Photo';
+  return s.length > 32 ? s.slice(0, 32) + '…' : s;
+};
+let store = null;
+try { store = JSON.parse(localStorage.getItem(SKEY)); } catch (e) {}
+if (!store || !Array.isArray(store.chats) || !store.chats.length) {
+  const c = newChatObj();
+  try { c.msgs = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
+  c.title = titleFrom(c.msgs) || 'New chat';
+  store = { active: c.id, chats: [c] };
+}
+const cur = () => store.chats.find(c => c.id === store.active) || store.chats[0];
+store.active = cur().id;
+let chat = cur().msgs, busy = false, pendingImg = null, quiet = false;
+const persist = () => { try { localStorage.setItem(SKEY, JSON.stringify({ active: store.active, chats: store.chats.map(c => ({ ...c, msgs: c.msgs.slice(-200).map(({ img, ...m }) => m) })) })); } catch (e) {} };
+const save = () => { const c = cur(); if (c.msgs.some(m => m.r === 'user')) { c.t = Date.now(); if (!c.custom) c.title = titleFrom(c.msgs); } persist(); };
 const clock = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -174,7 +231,7 @@ function add(m, state) {
     tk = document.createElement('span'); setTicks(tk, state || 'seen');
     meta.append(time, tk);
   }
-  row.append(b); list.append(row); toBottom();
+  row.append(b); list.append(row); if (!quiet) toBottom();
   return tk;
 }
 
@@ -310,15 +367,109 @@ file.addEventListener('change', () => {
   img.onerror = () => { URL.revokeObjectURL(url); toast('Ye photo khul nahi payi 😅'); };
   img.src = url;
 });
+const ICON_EDIT = '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/></svg>';
+const ICON_DEL = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+const side = $('#side'), scrim = $('#scrim'), qEl = $('#q'), box = $('#chats');
+const guardBusy = () => { if (busy) { toast('Pehle reply aane do, phir chat badlo ⏳'); return true; } return false; };
+const snip = c => {
+  if (!c.msgs.some(m => m.r === 'user')) return 'Abhi kuch nahi bheja';
+  const m = [...c.msgs].reverse().find(x => x.c); if (!m) return '📷 Photo';
+  return m.c.length > 38 ? m.c.slice(0, 38) + '…' : m.c;
+};
+
+function openSide() { renderSide(); side.inert = false; side.classList.add('open'); scrim.classList.add('show'); }
+function closeSide() { side.classList.remove('open'); scrim.classList.remove('show'); side.inert = true; }
+
+function renderChat() {
+  stopSpeak(); list.innerHTML = ''; quiet = true;
+  chat.forEach(m => add(m)); quiet = false;
+  if (!chat.length) welcome();
+  chatEl.scrollTo({ top: chatEl.scrollHeight });
+}
+
+function renderSide() {
+  const q = qEl.value.trim().toLowerCase();
+  const items = [...store.chats].sort((a, b) => b.t - a.t)
+    .filter(c => !q || c.title.toLowerCase().includes(q) || c.msgs.some(m => (m.c || '').toLowerCase().includes(q)));
+  box.innerHTML = '';
+  if (!items.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Koi chat nahi mili'; box.append(p); return; }
+  items.forEach(c => {
+    const el = document.createElement('div'); el.className = 'ci' + (c.id === store.active ? ' on' : '');
+    const o = document.createElement('button'); o.className = 'co';
+    const b = document.createElement('b'); b.textContent = c.title;
+    const s = document.createElement('small'); s.textContent = snip(c);
+    o.append(b, s); o.onclick = () => openChat(c.id);
+    const r = document.createElement('button'); r.className = 'ca'; r.innerHTML = ICON_EDIT; r.setAttribute('aria-label', 'Naam badlo'); r.onclick = () => renameChat(c.id);
+    const d = document.createElement('button'); d.className = 'ca del'; d.innerHTML = ICON_DEL; d.setAttribute('aria-label', 'Chat delete karo'); d.onclick = () => delChat(c.id);
+    el.append(o, r, d); box.append(el);
+  });
+}
+
+function openChat(id) {
+  if (id === store.active) return closeSide();
+  if (guardBusy()) return;
+  store.active = id; chat = cur().msgs; clearImg(); renderChat(); persist(); renderSide(); closeSide();
+}
+
+function newChat() {
+  if (guardBusy()) return;
+  if (!chat.some(m => m.r === 'user')) { closeSide(); toast('Ye already naya chat hai ✨'); msg.focus(); return; }
+  const c = newChatObj(); store.chats.push(c); store.active = c.id; chat = c.msgs;
+  clearImg(); renderChat(); persist(); renderSide(); closeSide(); msg.focus();
+}
+
+function renameChat(id) {
+  const c = store.chats.find(x => x.id === id); if (!c) return;
+  const n = prompt('Chat ka naya naam (khali chhodo to auto naam):', c.title); if (n === null) return;
+  const v = n.trim().slice(0, 40);
+  if (v) { c.title = v; c.custom = true; } else { c.custom = false; c.title = titleFrom(c.msgs) || 'New chat'; }
+  persist(); renderSide();
+}
+
+function delChat(id) {
+  const c = store.chats.find(x => x.id === id); if (!c) return;
+  if (id === store.active && guardBusy()) return;
+  if (!confirm('"' + c.title + '" delete kar du?')) return;
+  store.chats = store.chats.filter(x => x.id !== id);
+  if (!store.chats.length) store.chats.push(newChatObj());
+  if (id === store.active) {
+    store.active = [...store.chats].sort((a, b) => b.t - a.t)[0].id; chat = cur().msgs; clearImg(); renderChat();
+  }
+  persist(); renderSide();
+}
+
+$('#menu').addEventListener('click', openSide);
+$('#sclose').addEventListener('click', closeSide);
+scrim.addEventListener('click', closeSide);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSide(); });
+$('#newh').addEventListener('click', newChat);
+$('#newc').addEventListener('click', newChat);
+qEl.addEventListener('input', renderSide);
+
 $('#clear').addEventListener('click', () => {
-  if (!confirm('Poori chat clear kar du?')) return;
-  stopSpeak(); chat = []; list.innerHTML = ''; try { localStorage.removeItem(KEY); } catch (e) {}
-  welcome();
+  if (guardBusy() || !confirm('Is chat ke saare messages clear kar du?')) return;
+  const c = cur(); c.msgs = chat = []; c.custom = false; c.title = 'New chat';
+  clearImg(); renderChat(); persist(); renderSide();
+});
+
+$('#delall').addEventListener('click', () => {
+  if (guardBusy() || !confirm('Saari chats delete kar du? Ye wapas nahi aayengi.')) return;
+  const c = newChatObj(); store = { active: c.id, chats: [c] }; chat = c.msgs;
+  clearImg(); renderChat(); persist(); renderSide(); closeSide();
+});
+
+$('#export').addEventListener('click', () => {
+  if (!chat.length) return toast('Export karne ko kuch nahi hai');
+  const text = chat.map(m => '[' + clock(m.t) + '] ' + (m.r === 'user' ? 'Tum' : 'Kayth AI') + ': ' + (m.c || '📷 Photo')).join('\n\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  a.download = (cur().title.replace(/[^\w\- ]+/g, '').trim().slice(0, 30) || 'kayth-chat') + '.txt';
+  a.click(); URL.revokeObjectURL(a.href);
 });
 
 function welcome() { const m = { r: 'assistant', c: WELCOME, t: Date.now() }; chat.push(m); add(m); save(); }
 
-if (chat.length) chat.forEach(m => add(m)); else welcome();
+renderChat(); renderSide();
 setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
 </script>
 </body>
