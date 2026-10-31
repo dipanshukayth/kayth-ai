@@ -1,1 +1,293 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Kayth AI</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}body{background:#000;color:#fff;height:100vh;display:flex;flex-direction:column}.top{padding:14px;border-bottom:1px solid #222;font-weight:900;font-size:22px}#chat{flex:1;overflow-y:auto;padding:15px;display:flex;flex-direction:column;gap:12px}.user{align-self:flex-end;background:#FFFC00;color:#000;font-weight:700;padding:12px 16px;border-radius:20px 20px 0 20px;max-width:75%}.ai{align-self:flex-start;background:#262626;padding:12px 16px;border-radius:20px 20px 20px 0;max-width:80%;border:1px solid #333}.input-wrap{padding:10px;background:#121212;display:flex;gap:8px}.input-wrap input{flex:1;background:#262626;border:none;border-radius:25px;padding:14px 18px;color:#fff;outline:none}button{width:50px;height:50px;border-radius:50%;border:none;background:yellow;font-weight:900}</style></head><body><div class="top">Kayth AI by Dipanshu</div><div id="chat"><div class="ai">Yo! Main Kayth AI hu, Dipanshu ne banaya hai. Pucho kuch bhi! 🚀</div></div><div class="input-wrap"><input id="msg" placeholder="Message..."><button onclick="send()">></button></div><script>const chatDiv=document.getElementById('chat');async function send(){let input=document.getElementById('msg');let m=input.value.trim();if(!m)return;chatDiv.innerHTML+=`<div class="user">${m}</div>`;input.value='';let tid=Date.now();chatDiv.innerHTML+=`<div class="ai" id="${tid}">typing...</div>`;chatDiv.scrollTop=chatDiv.scrollHeight;try{let res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});let data=await res.json();document.getElementById(tid).innerHTML=data.reply;}catch(e){document.getElementById(tid).innerHTML="Error boss, fir se bolo 😅";}chatDiv.scrollTop=chatDiv.scrollHeight;}document.getElementById('msg').addEventListener('keypress',e=>{if(e.key==='Enter')send()});</script></body></html>
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>Kayth AI 👻</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👻</text></svg>">
+<style>
+:root{--y:#FFFC00;--card:#151518;--mut:#8e8e93;--ig:linear-gradient(135deg,#8a3ab9 0%,#e1306c 55%,#fcaf45 100%)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{display:flex;justify-content:center}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offset:2px}
+.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.app{width:100%;max-width:720px;height:100%;height:100dvh;display:flex;flex-direction:column;border-inline:1px solid #151515}
+
+/* header */
+header{display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid #1a1a1a}
+.story{position:relative;width:46px;height:46px;flex:none}
+.ring{position:absolute;inset:0;border-radius:50%;overflow:hidden}
+.ring::before{content:"";position:absolute;inset:-50%;background:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
+.av{position:absolute;inset:3px;border-radius:50%;background:#000;border:2px solid #000;display:grid;place-items:center;font-weight:800;font-size:18px;background:linear-gradient(#111,#000);z-index:1}
+.dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:var(--y);border:2.5px solid #000;z-index:2}
+.who{flex:1;min-width:0}
+.who b{display:block;font-size:18px;font-weight:800;letter-spacing:-.3px}
+.who small{display:block;font-size:12.5px;color:var(--mut);margin-top:1px}
+.who small.on{color:var(--y)}
+.hbtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#c7c7cc}
+.hbtn:active{background:#1c1c1e}
+body.busy .ring::before{animation:spin 1.1s linear infinite}
+
+/* chat */
+#chat{flex:1;overflow-y:auto;padding:12px 14px 6px;scrollbar-width:thin;scrollbar-color:#222 transparent;overscroll-behavior:contain}
+.chip{width:max-content;margin:2px auto 14px;display:flex;align-items:center;gap:7px;font-size:12.5px;color:#b5b5ba;padding:6px 12px;border-radius:99px;background:var(--card)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--y)}
+.row{display:flex;margin:5px 0}
+.row.user{justify-content:flex-end}
+.b{max-width:82%;padding:9px 13px 6px;border-radius:20px;font-size:15.5px;line-height:1.4;word-break:break-word}
+.row.ai .b{background:var(--ig);border-bottom-left-radius:6px}
+.row.user .b{background:var(--y);color:#000;border-bottom-right-radius:6px}
+.t{white-space:pre-wrap}
+.meta{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:3px;font-size:11px;opacity:.8;min-height:18px}
+.row.ai .meta{opacity:.9}
+.spk{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;margin-right:auto;background:rgba(0,0,0,.25)}
+.spk .i{width:14px;height:14px}
+.spk.on{background:#fff;color:#c13584;animation:pulse 1s infinite}
+.tk .i{width:16px;height:16px;stroke-width:2.4}
+.tk{display:inline-flex;color:rgba(0,0,0,.5)}
+.tk.seen{color:#0a66ff}
+.typing .b{background:var(--card);display:flex;align-items:center;gap:10px;padding:11px 14px;color:#b5b5ba;font-size:13.5px}
+.dots{display:flex;gap:4px}
+.dots i{width:7px;height:7px;border-radius:50%;background:#b5b5ba;animation:bounce 1.2s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+
+/* input */
+footer{display:flex;align-items:center;gap:10px;padding:8px 12px calc(10px + env(safe-area-inset-bottom));position:relative}
+.pill{flex:1;position:relative;display:flex;align-items:center;gap:4px;height:48px;padding:0 6px;border-radius:99px;background:var(--card);border:1px solid #232327}
+.pill:focus-within{border-color:#3a3a3f}
+.pill .ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#c7c7cc}
+.pill .ic:active{background:#222}
+#msg{flex:1;min-width:0;height:100%;background:none;border:0;outline:0;color:#fff;font:inherit;font-size:16px;padding:0 6px}
+#msg::placeholder{color:#6e6e73}
+#msg:focus-visible{outline:0}
+#act{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid #232327;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;position:relative;transition:background .15s,color .15s}
+#act .snd{display:none}
+footer.has #act{background:var(--y);color:#000;border-color:var(--y)}
+footer.has #act .mic{display:none}
+footer.has #act .snd{display:block}
+#act.rec{background:#ff2d3d;border-color:#ff2d3d;color:#fff;animation:ripple 1.1s infinite;transform:scale(1.12)}
+.recbar{position:absolute;inset:0;border-radius:99px;background:#1d0709;border:1px solid #5a1219;display:none;align-items:center;gap:10px;padding:0 16px;font-size:14px;color:#ffb3b9;overflow:hidden}
+.recbar.show{display:flex}
+.recbar i{width:11px;height:11px;border-radius:50%;background:#ff2d3d;flex:none;animation:pulse 1s infinite}
+.recbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recbar.cancel{background:#222;border-color:#444;color:#ddd}
+.recbar.cancel i{background:#888;animation:none}
+#toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translate(-50%,10px);background:#2a2a2e;color:#fff;font-size:13.5px;padding:9px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:.2s;max-width:90vw;text-align:center;z-index:9}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
+@keyframes pulse{50%{opacity:.35}}
+@keyframes ripple{0%{box-shadow:0 0 0 0 rgba(255,45,61,.6)}100%{box-shadow:0 0 0 16px rgba(255,45,61,0)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="story"><div class="ring"></div><div class="av">K</div><i class="dot" title="Online"></i></div>
+    <div class="who"><b>Kayth AI 👻</b><small id="sub">online</small></div>
+    <button class="hbtn" id="clear" aria-label="Clear chat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+  </header>
+
+  <main id="chat">
+    <div class="chip"><i></i>Kayth AI was active now</div>
+    <div id="list"></div>
+  </main>
+
+  <footer id="foot">
+    <div class="pill">
+      <button class="ic" id="gal" aria-label="Gallery"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg></button>
+      <input id="msg" type="text" placeholder="Message bhejo..." autocomplete="off" enterkeyhint="send" maxlength="1000">
+      <div class="recbar" id="recbar"><i></i><span id="rt">Sun raha hu...</span></div>
+    </div>
+    <button id="act" aria-label="Hold to record, or send">
+      <svg class="i mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+      <svg class="i snd" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+    </button>
+  </footer>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const chatEl = $('#chat'), list = $('#list'), msg = $('#msg'), foot = $('#foot'), act = $('#act'),
+      sub = $('#sub'), recbar = $('#recbar'), rt = $('#rt'), toastEl = $('#toast');
+const KEY = 'kayth_chat_v1';
+const ICON_SPK = '<svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
+const TICK1 = '<svg class="i" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 7"/></svg>';
+const TICK2 = '<svg class="i" viewBox="0 0 24 24"><path d="M1.5 12.5l5 5L17 7M10 16.5l1 1L22 7"/></svg>';
+const OFFLINE = [
+  'Net ne dhoka de diya bhai 📡 connection check kar aur phir bhej!',
+  'Server tak pahunch hi nahi paya 😭 thodi der baad try kar.',
+  'Arre yaar, beech raste mein message kho gaya 💀 dobara bhej na!'
+];
+const WELCOME = 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai?';
+
+let chat = [], busy = false;
+try { chat = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { chat = []; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(chat.slice(-200))); } catch (e) {} };
+const clock = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const toBottom = () => chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
+
+let toastT;
+function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2400); }
+
+/* ---------- render ---------- */
+function setTicks(el, s) { el.className = 'tk ' + s; el.innerHTML = s === 'sent' ? TICK1 : TICK2; }
+
+function add(m, state) {
+  const ai = m.r === 'assistant';
+  const row = document.createElement('div');
+  row.className = 'row ' + (ai ? 'ai' : 'user');
+  const b = document.createElement('div'); b.className = 'b';
+  const t = document.createElement('div'); t.className = 't'; t.textContent = m.c;
+  const meta = document.createElement('div'); meta.className = 'meta';
+  b.append(t, meta);
+  let tk = null;
+  if (ai) {
+    const s = document.createElement('button');
+    s.className = 'spk'; s.innerHTML = ICON_SPK; s.setAttribute('aria-label', 'Reply sunao');
+    s.onclick = () => speak(m.c, s);
+    const time = document.createElement('span'); time.textContent = clock(m.t);
+    meta.append(s, time);
+  } else {
+    const time = document.createElement('span'); time.textContent = clock(m.t);
+    tk = document.createElement('span'); setTicks(tk, state || 'seen');
+    meta.append(time, tk);
+  }
+  row.append(b); list.append(row); toBottom();
+  return tk;
+}
+
+function showTyping(on) {
+  let el = $('#typing');
+  document.body.classList.toggle('busy', on);
+  sub.textContent = on ? 'typing...' : 'online'; sub.classList.toggle('on', on);
+  if (on && !el) {
+    el = document.createElement('div'); el.id = 'typing'; el.className = 'row ai typing';
+    el.innerHTML = '<div class="b"><div class="dots"><i></i><i></i><i></i></div>Kayth AI is typing...</div>';
+    list.append(el); toBottom();
+  } else if (!on && el) el.remove();
+}
+
+/* ---------- send ---------- */
+async function send(text) {
+  text = (text || '').trim();
+  if (!text || busy) return;
+  busy = true; msg.value = ''; sync(); stopSpeak();
+  const history = chat.slice(-10).map(m => ({ role: m.r, content: m.c }));
+  const um = { r: 'user', c: text, t: Date.now() };
+  chat.push(um); const tk = add(um, 'sent'); save();
+  setTimeout(() => setTicks(tk, 'delivered'), 350);
+  showTyping(true);
+  const seenT = setTimeout(() => setTicks(tk, 'seen'), 900);
+
+  let reply = '';
+  try {
+    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, history }) });
+    const d = await res.json(); reply = d.reply || '';
+  } catch (e) {}
+  clearTimeout(seenT); setTicks(tk, 'seen');
+  if (!reply) reply = pick(OFFLINE);
+  showTyping(false);
+  const am = { r: 'assistant', c: reply, t: Date.now() };
+  chat.push(am); add(am); save(); busy = false;
+}
+
+msg.addEventListener('input', sync);
+msg.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(msg.value); } });
+function sync() { foot.classList.toggle('has', !!msg.value.trim()); }
+
+/* ---------- text to speech ---------- */
+function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
+function speak(text, btn) {
+  if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
+  if (btn.classList.contains('on')) return stopSpeak();
+  stopSpeak();
+  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
+  u.lang = 'hi-IN';
+  const v = speechSynthesis.getVoices().find(x => x.lang === 'hi-IN') || speechSynthesis.getVoices().find(x => x.lang === 'en-IN');
+  if (v) u.voice = v;
+  u.onend = u.onerror = () => btn.classList.remove('on');
+  btn.classList.add('on'); speechSynthesis.speak(u);
+}
+if ('speechSynthesis' in window) speechSynthesis.getVoices();
+
+/* ---------- voice (hold to record) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let sess = null, startX = 0;
+
+function setRec(on) { act.classList.toggle('rec', on); recbar.classList.toggle('show', on); recbar.classList.remove('cancel'); if (on) rt.textContent = 'Sun raha hu... bolo'; }
+
+function startRec(x) {
+  if (busy) return;
+  if (!SR) return toast('Voice ke liye Chrome ya Edge use karo');
+  stopSpeak();
+  const r = new SR();
+  const s = sess = { r, text: '', cancelled: false, t0: Date.now(), live: true };
+  r.lang = 'hi-IN'; r.continuous = true; r.interimResults = true;
+  r.onresult = e => {
+    let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+    s.text = t; if (!s.cancelled) rt.textContent = t || 'Sun raha hu... bolo';
+  };
+  r.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Mic permission allow karo');
+    else if (e.error === 'network') toast('Voice ke liye internet chahiye');
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice error: ' + e.error);
+    s.cancelled = true;
+  };
+  r.onend = () => {
+    if (s.live) { s.live = false; setRec(false); }
+    const t = s.text.trim();
+    if (s.cancelled) return;
+    if (t) send(t); else toast('Kuch suna nahi, phir se bol 🎙️');
+  };
+  startX = x;
+  try { r.start(); setRec(true); } catch (e) { toast('Mic start nahi hua, dobara try kar'); }
+}
+
+function stopRec() {
+  const s = sess; if (!s || !s.live) return;
+  s.live = false; setRec(false);
+  if (Date.now() - s.t0 < 450) { s.cancelled = true; toast('Mic ko hold karke bolo 🎙️'); }
+  try { s.cancelled ? s.r.abort() : s.r.stop(); } catch (e) {}
+}
+
+act.addEventListener('pointerdown', e => {
+  if (msg.value.trim()) return;
+  e.preventDefault(); act.setPointerCapture(e.pointerId); startRec(e.clientX);
+});
+act.addEventListener('pointermove', e => {
+  const s = sess; if (!s || !s.live) return;
+  s.cancelled = startX - e.clientX > 90;
+  recbar.classList.toggle('cancel', s.cancelled);
+  if (s.cancelled) rt.textContent = 'Chhodo to cancel ho jayega';
+  else rt.textContent = s.text || 'Sun raha hu... bolo';
+});
+act.addEventListener('pointerup', stopRec);
+act.addEventListener('pointercancel', stopRec);
+act.addEventListener('contextmenu', e => e.preventDefault());
+act.addEventListener('click', () => { if (msg.value.trim()) send(msg.value); });
+
+/* ---------- misc ---------- */
+$('#gal').addEventListener('click', () => toast('Photo samajhna abhi seekh raha hu 📸 jaldi aayega!'));
+$('#clear').addEventListener('click', () => {
+  if (!confirm('Poori chat clear kar du?')) return;
+  stopSpeak(); chat = []; list.innerHTML = ''; try { localStorage.removeItem(KEY); } catch (e) {}
+  welcome();
+});
+
+function welcome() { const m = { r: 'assistant', c: WELCOME, t: Date.now() }; chat.push(m); add(m); save(); }
+
+if (chat.length) chat.forEach(m => add(m)); else welcome();
+setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
+</script>
+</body>
+</html>
