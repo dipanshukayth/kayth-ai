@@ -13,14 +13,7 @@ def service_worker():
     return send_from_directory('static', 'sw.js')
 
 def env(name, default=""):
-    return os.environ.get(name, default).strip().strip("'\"").strip()
-
-API_KEY = env("GROQ_API_KEY")
-client = Groq(api_key=API_KEY) if API_KEY else None
-
-_models = [env("GROQ_MODEL"), "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
-TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
-
+    return os.environ.get(name, default).strip().strip("'\"").strip(
 
 
 API_KEY = env("GROQ_API_KEY")
