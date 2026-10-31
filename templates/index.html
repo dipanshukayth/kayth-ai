@@ -79,6 +79,12 @@ footer.has #act .snd{display:block}
 #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translate(-50%,10px);background:#2a2a2e;color:#fff;font-size:13.5px;padding:9px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:.2s;max-width:90vw;text-align:center;z-index:9}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 
+.prev{position:absolute;left:12px;bottom:100%;display:none;align-items:center;gap:8px;padding:6px;border-radius:16px;background:var(--card);border:1px solid #232327}
+.prev.show{display:flex}
+.prev img{width:56px;height:56px;object-fit:cover;border-radius:10px}
+.prev button{width:26px;height:26px;border-radius:50%;background:#2a2a2e;display:grid;place-items:center}
+.prev button .i{width:14px;height:14px}
+.b img{display:block;max-width:100%;max-height:260px;border-radius:12px;margin-bottom:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 @keyframes pulse{50%{opacity:.35}}
@@ -100,6 +106,8 @@ footer.has #act .snd{display:block}
   </main>
 
   <footer id="foot">
+    <div class="prev" id="prev"><img id="pimg" alt="Chuni hui photo"><button id="prem" aria-label="Photo hatao"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <input type="file" id="file" accept="image/*" hidden>
     <div class="pill">
       <button class="ic" id="gal" aria-label="Gallery"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg></button>
       <input id="msg" type="text" placeholder="Message bhejo..." autocomplete="off" enterkeyhint="send" maxlength="1000">
@@ -128,9 +136,9 @@ const OFFLINE = [
 ];
 const WELCOME = 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai?';
 
-let chat = [], busy = false;
+let chat = [], busy = false, pendingImg = null;
 try { chat = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { chat = []; }
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(chat.slice(-200))); } catch (e) {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(chat.slice(-200).map(({ img, ...m }) => m))); } catch (e) {} };
 const clock = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -149,6 +157,10 @@ function add(m, state) {
   const b = document.createElement('div'); b.className = 'b';
   const t = document.createElement('div'); t.className = 't'; t.textContent = m.c;
   const meta = document.createElement('div'); meta.className = 'meta';
+  if (m.p) {
+    if (m.img) { const im = document.createElement('img'); im.src = m.img; im.alt = 'Photo'; b.append(im); }
+    else if (!m.c) t.textContent = '📷 Photo';
+  }
   b.append(t, meta);
   let tk = null;
   if (ai) {
@@ -180,10 +192,11 @@ function showTyping(on) {
 /* ---------- send ---------- */
 async function send(text) {
   text = (text || '').trim();
-  if (!text || busy) return;
-  busy = true; msg.value = ''; sync(); stopSpeak();
-  const history = chat.slice(-10).map(m => ({ role: m.r, content: m.c }));
-  const um = { r: 'user', c: text, t: Date.now() };
+  const image = pendingImg;
+  if ((!text && !image) || busy) return;
+  busy = true; msg.value = ''; clearImg(); stopSpeak();
+  const history = chat.slice(-10).map(m => ({ role: m.r, content: m.c || (m.p ? '[photo bheji]' : '') })).filter(m => m.content);
+  const um = { r: 'user', c: text, t: Date.now(), p: !!image, img: image };
   chat.push(um); const tk = add(um, 'sent'); save();
   setTimeout(() => setTicks(tk, 'delivered'), 350);
   showTyping(true);
@@ -191,8 +204,9 @@ async function send(text) {
 
   let reply = '';
   try {
-    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, history }) });
+    const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, history, image }) });
     const d = await res.json(); reply = d.reply || '';
+    if (d.err) console.warn('Kayth AI error:', d.err);
   } catch (e) {}
   clearTimeout(seenT); setTicks(tk, 'seen');
   if (!reply) reply = pick(OFFLINE);
@@ -203,7 +217,7 @@ async function send(text) {
 
 msg.addEventListener('input', sync);
 msg.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(msg.value); } });
-function sync() { foot.classList.toggle('has', !!msg.value.trim()); }
+function sync() { foot.classList.toggle('has', !!msg.value.trim() || !!pendingImg); }
 
 /* ---------- text to speech ---------- */
 function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
@@ -261,7 +275,7 @@ function stopRec() {
 }
 
 act.addEventListener('pointerdown', e => {
-  if (msg.value.trim()) return;
+  if (msg.value.trim() || pendingImg) return;
   e.preventDefault(); act.setPointerCapture(e.pointerId); startRec(e.clientX);
 });
 act.addEventListener('pointermove', e => {
@@ -274,10 +288,28 @@ act.addEventListener('pointermove', e => {
 act.addEventListener('pointerup', stopRec);
 act.addEventListener('pointercancel', stopRec);
 act.addEventListener('contextmenu', e => e.preventDefault());
-act.addEventListener('click', () => { if (msg.value.trim()) send(msg.value); });
+act.addEventListener('click', () => { if (msg.value.trim() || pendingImg) send(msg.value); });
 
 /* ---------- misc ---------- */
-$('#gal').addEventListener('click', () => toast('Photo samajhna abhi seekh raha hu 📸 jaldi aayega!'));
+const file = $('#file'), prev = $('#prev'), pimg = $('#pimg');
+function clearImg() { pendingImg = null; prev.classList.remove('show'); file.value = ''; sync(); }
+$('#prem').addEventListener('click', clearImg);
+$('#gal').addEventListener('click', () => file.click());
+file.addEventListener('change', () => {
+  const f = file.files[0]; if (!f) return;
+  if (!f.type.startsWith('image/')) return toast('Sirf photo choose karo 📸');
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => {
+    const sc = Math.min(1, 1024 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    pendingImg = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url);
+    pimg.src = pendingImg; prev.classList.add('show'); sync(); msg.focus();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('Ye photo khul nahi payi 😅'); };
+  img.src = url;
+});
 $('#clear').addEventListener('click', () => {
   if (!confirm('Poori chat clear kar du?')) return;
   stopSpeak(); chat = []; list.innerHTML = ''; try { localStorage.removeItem(KEY); } catch (e) {}
