@@ -24,7 +24,7 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 VISION_MODEL = env("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
 
 SYSTEM_PROMPT = (
-    "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Siwani, Haryana. "
+    "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. "
     "You are NOT ChatGPT or Meta AI. You talk in Hinglish, funny, Gen-Z, max 3 lines. "
     "If user says 'I am Dipanshu' or 'boss' or 'creator' then say "
     "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Never say you are made by OpenAI."
@@ -83,6 +83,17 @@ def complete(models, messages):
     raise last or RuntimeError("no model configured")
 
 
+def file_note(f):
+    name = str(f.get("name", ""))[:80]
+    text = f.get("text") if isinstance(f.get("text"), str) else ""
+    if text.strip():
+        return "\n\n[User ne file bheji: %s]\n```\n%s\n```" % (name, text[:12000])
+    return (
+        "\n\n[User ne file '%s' (%s) bheji hai, par uska content padh nahi sakte. "
+        "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
+    )
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -125,6 +136,7 @@ def chat():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
     image = data.get("image")
+    file = data.get("file") if isinstance(data.get("file"), dict) else None
     message = message.strip()[:1000] if isinstance(message, str) else ""
 
     if image is not None:
@@ -132,8 +144,10 @@ def chat():
             return jsonify({"reply": BAD_IMAGE_REPLY}), 400
         if not message:
             message = "Is photo mein kya hai? Batao."
-    elif not message:
+    elif not message and not file:
         return jsonify({"reply": "Kuch likh to sahi bhai 😅"}), 400
+    if file and not message:
+        message = "Is file mein kya hai? Short mein batao."
 
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
         return jsonify({"reply": BOSS_REPLY})
@@ -151,7 +165,7 @@ def chat():
         }
         models = [VISION_MODEL]
     else:
-        user_msg = {"role": "user", "content": message}
+        user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
