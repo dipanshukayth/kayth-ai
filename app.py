@@ -2,7 +2,15 @@ import os
 import re
 import random
 from urllib.parse import quote
+from flask import send_from_directory
 
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory('static', 'manifest.json')
+
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory('static', 'sw.js')
 from flask import Flask, render_template, request, jsonify
 from groq import Groq, RateLimitError
 
