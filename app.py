@@ -217,8 +217,10 @@ def health():
 @app.route("/debug")
 def debug():
     """Browser me kholo: kayth-ai-2.onrender.com/debug. Kaam hone ke baad hata dena."""
-    if not DEBUG_KEY or request.args.get("k") != DEBUG_KEY:
-        return "Not found", 404
+    if not DEBUG_KEY:
+        return "DEBUG_KEY Render me set nahi hai (ya deploy abhi nahi hua).", 404
+    if request.args.get("k") != DEBUG_KEY:
+        return "Key galat hai. Link me ?k= ke baad wahi shabd likho jo DEBUG_KEY ki Value me hai.", 404
     lines = [
         "GROQ_API_KEY set: %s" % bool(API_KEY),
         "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
