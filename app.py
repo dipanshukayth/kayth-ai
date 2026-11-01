@@ -4,6 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import random
 import re
+import threading
+import time
+from collections import defaultdict, deque
 from urllib.parse import quote
 
 from flask import Flask, render_template, request, jsonify
@@ -19,6 +22,7 @@ def env(name, default=""):
 
 
 API_KEY = env("GROQ_API_KEY")
+DEBUG_KEY = env("DEBUG_KEY")   # /debug tabhi khulega jab ye set ho: /debug?k=<DEBUG_KEY>
 client = Groq(api_key=API_KEY) if API_KEY else None
 
 # llama-3.1-8b-instant Groq ne 16 Aug 2026 ko band kar diya.
@@ -53,7 +57,7 @@ def clean_history(history):
     out = []
     if not isinstance(history, list):
         return out
-    for m in history[-10:]:
+    for m in history[-6:]:
         if (
             isinstance(m, dict)
             and m.get("role") in ("user", "assistant")
@@ -88,11 +92,64 @@ def complete(models, messages, max_tokens=800, timeout=25):
     raise last or RuntimeError("no model configured")
 
 
+# ----- Per-IP limits: ek banda poora Groq quota na kha jaye -----
+# (per minute, per day). Render ke env se badal sakte ho, jaise LIMIT_CHAT_PER_DAY=40
+LIMITS = {
+    "chat": (int(env("LIMIT_CHAT_PER_MIN", "5")), int(env("LIMIT_CHAT_PER_DAY", "30"))),
+    "photo": (int(env("LIMIT_PHOTO_PER_MIN", "1")), int(env("LIMIT_PHOTO_PER_DAY", "3"))),
+    "image": (int(env("LIMIT_IMAGE_PER_MIN", "3")), int(env("LIMIT_IMAGE_PER_DAY", "10"))),
+}
+LIMIT_MSG = {
+    "chat": ("Thoda dheere bhai 😅 1 minute mein itne messages nahi chalte, thodi der ruk ke bhej.",
+             "Aaj ke free messages khatam 😅 kal phir aa, tab tak naye messages ke liye refresh mat kar!"),
+    "photo": ("Photo thodi der baad bhejna 📸 abhi pichli wali ka kaam chal raha hai.",
+              "Aaj ke free photo-checks khatam 📸 kal phir bhej!"),
+    "image": ("Itni jaldi nahi bhai 🎨 thodi der baad phir bol.",
+              "Aaj ki free images khatam 🎨 kal phir bana dunga!"),
+}
+_hits = defaultdict(deque)
+_lock = threading.Lock()
+
+
+def client_ip():
+    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?"
+
+
+def hit(kind):
+    """(ok, message, token). Limit ke andar ho to 1 gin leta hai."""
+    key, now = (client_ip(), kind), time.time()
+    per_min, per_day = LIMITS[kind]
+    with _lock:
+        q = _hits[key]
+        while q and now - q[0] > 86400:
+            q.popleft()
+        if len(q) >= per_day:
+            return False, LIMIT_MSG[kind][1], None
+        if sum(1 for t in q if now - t < 60) >= per_min:
+            return False, LIMIT_MSG[kind][0], None
+        q.append(now)
+        if len(_hits) > 5000:   # purane IPs saaf karo
+            for k in [k for k, d in _hits.items() if not d or now - d[-1] > 86400]:
+                del _hits[k]
+        return True, None, (key, now)
+
+
+def give_back(token):
+    """Groq fail hua to gin wapas kar do."""
+    if not token:
+        return
+    key, ts = token
+    with _lock:
+        q = _hits.get(key)
+        if q and ts in q:
+            q.remove(ts)
+
+
 def file_note(f):
     name = str(f.get("name", ""))[:80]
     text = f.get("text") if isinstance(f.get("text"), str) else ""
     if text.strip():
-        return "\n\n[User ne file bheji: %s]\n```\n%s\n```" % (name, text[:12000])
+        return "\n\n[User ne file bheji: %s]\n```\n%s\n```" % (name, text[:6000])
     return (
         "\n\n[User ne file '%s' (%s) bheji hai, par uska content padh nahi sakte. "
         "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
@@ -123,6 +180,10 @@ def image():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
 
+    ok, msg, token = hit("image")
+    if not ok:
+        return jsonify({"reply": msg, "limit": True})
+
     prompt = message
     if client is not None:
         try:
@@ -137,6 +198,7 @@ def image():
 
     prompt = " ".join(prompt.split()).strip("\"'")[:300]
     if not prompt or prompt.upper().startswith("REFUSE"):
+        give_back(token)
         return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
 
     # Pollinations ka free endpoint: browser seedha image load karta hai
@@ -155,6 +217,8 @@ def health():
 @app.route("/debug")
 def debug():
     """Browser me kholo: kayth-ai-2.onrender.com/debug. Kaam hone ke baad hata dena."""
+    if not DEBUG_KEY or request.args.get("k") != DEBUG_KEY:
+        return "Not found", 404
     lines = [
         "GROQ_API_KEY set: %s" % bool(API_KEY),
         "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
@@ -215,6 +279,10 @@ def chat():
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
 
+    ok, msg, token = hit("photo" if image else "chat")
+    if not ok:
+        return jsonify({"reply": msg, "limit": True})
+
     if image:
         user_msg = {
             "role": "user",
@@ -231,11 +299,13 @@ def chat():
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
 
     try:
-        return jsonify({"reply": complete(models, messages, 2000 if image else 800)})
+        return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
     except RateLimitError:
+        give_back(token)
         return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
     except Exception as e:
         app.logger.exception("Groq call failed")
+        give_back(token)
         return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
 
 
