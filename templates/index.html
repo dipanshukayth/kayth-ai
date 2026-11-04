@@ -32,6 +32,13 @@ header{display:flex;align-items:center;gap:6px;padding:calc(10px + env(safe-area
 .hbtn:active{background:#1c1c1e}
 body.busy .ring::before{animation:spin 1.1s linear infinite}
 
+/* mode bar */
+.modes{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #1a1a1a}
+.modes::-webkit-scrollbar{display:none}
+.mode{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:99px;background:var(--card);border:1px solid #232327;color:#c7c7cc;font-size:13.5px;font-weight:600;white-space:nowrap}
+.mode:active{background:#1f1f24}
+.mode.on{background:var(--y);color:#000;border-color:var(--y)}
+
 /* chat */
 #chat{flex:1;overflow-y:auto;padding:12px 14px 6px;scrollbar-width:thin;scrollbar-color:#222 transparent;overscroll-behavior:contain}
 .chip{width:max-content;margin:2px auto 14px;display:flex;align-items:center;gap:7px;font-size:12.5px;color:#b5b5ba;padding:6px 12px;border-radius:99px;background:var(--card)}
@@ -139,6 +146,13 @@ aside.open{transform:none}
     <button class="hbtn" id="clear" aria-label="Clear chat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
   </header>
 
+  <nav class="modes" id="modes" aria-label="Mode chuno">
+    <button class="mode" data-mode="normal" aria-pressed="true">😊 Normal</button>
+    <button class="mode" data-mode="roast" aria-pressed="false">🔥 Roast</button>
+    <button class="mode" data-mode="study" aria-pressed="false">📚 Study</button>
+    <button class="mode" data-mode="genz" aria-pressed="false">😎 Gen-Z</button>
+  </nav>
+
   <main id="chat">
     <div class="chip"><i></i>Kayth AI was active now</div>
     <div id="list"></div>
@@ -195,6 +209,26 @@ const DEV_RE = /(इमेज|फोटो|फ़ोटो|तस्वीर|�
 const DRAW_RE = /^(draw|paint|sketch|imagine)\b/i;
 const HOWTO_RE = /\b(kaise|how to|how do|explain|samjha|kya hota|kya hai)\b|कैसे/i;
 
+/* ---------- modes (normal / roast / study / genz) ---------- */
+const MKEY = 'kayth_mode_v1';
+const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study', genz: 'Gen-Z' };
+let mode = 'normal';
+try { const saved = localStorage.getItem(MKEY); if (MODE_NAMES[saved]) mode = saved; } catch (e) {}
+function setMode(m, announce) {
+  if (!MODE_NAMES[m]) return;
+  mode = m;
+  try { localStorage.setItem(MKEY, m); } catch (e) {}
+  document.querySelectorAll('.mode').forEach(b => {
+    const on = b.dataset.mode === m;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  if (announce) toast(MODE_NAMES[m] + ' mode on ✅');
+}
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('.mode'); if (!b || b.dataset.mode === mode) return;
+  setMode(b.dataset.mode, true);
+});
+
 const SKEY = 'kayth_chats_v2';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const newChatObj = () => ({ id: uid(), title: 'New chat', t: Date.now(), custom: false, msgs: [] });
@@ -223,6 +257,8 @@ const toBottom = () => chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'sm
 
 let toastT;
 function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2400); }
+
+setMode(mode, false);
 
 /* ---------- render ---------- */
 function setTicks(el, s) { el.className = 'tk ' + s; el.innerHTML = s === 'sent' ? TICK1 : TICK2; }
@@ -297,7 +333,7 @@ async function send(text) {
 
   let reply = '', gen = null;
   try {
-    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att }) });
+    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att, mode }) });
     const d = await res.json(); reply = d.reply || ''; if (d.url) gen = { url: d.url, prompt: d.prompt || '' };
     if (d.err) console.warn('Kayth AI error:', d.err);
   } catch (e) {}
