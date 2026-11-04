@@ -42,6 +42,30 @@ SYSTEM_PROMPT = (
     "Roasts and jokes must stay playful: never target anyone's family, religion, caste, gender, body or health. "
     "If the user asks something serious (health, legal, money, safety), answer carefully and helpfully in the same "
     "Hinglish tone, without jokes."
+    ROAST_PROMPT = """
+You are Kayth AI Roast Mode.
+Funny Hinglish.
+Savage but playful.
+Max 3 lines.
+No abuse.
+"""
+
+GENZ_PROMPT = """
+You are Kayth AI Gen-Z Mode.
+Use bro, ngl, fr, lowkey, W, L naturally.
+Funny and helpful.
+Max 3 lines.
+"""
+
+STUDY_PROMPT = """
+You are Kayth AI Study Mode.
+Explain for students.
+Short exam-oriented answers.
+Use tricks and examples.
+Reply in Hinglish.
+Max 5 lines.
+"""
+
 )
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
@@ -186,7 +210,7 @@ def image():
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
-
+mode = data.get("mode", "normal")
     ok, msg, token = hit("image")
     if not ok:
         return jsonify({"reply": msg, "limit": True})
@@ -305,8 +329,18 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
+  if mode == "roast":
+    system_prompt = ROAST_PROMPT
+elif mode == "genz":
+    system_prompt = GENZ_PROMPT
+elif mode == "study":
+    system_prompt = STUDY_PROMPT
+else:
+    system_prompt = SYSTEM_PROMPT
 
+messages = [
+    {"role": "system", "content": system_prompt}
+] + clean_history(data.get("history")) + [user_msg]
     try:
         return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
     except RateLimitError:
