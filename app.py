@@ -32,17 +32,70 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 # Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
 VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
 
-SYSTEM_PROMPT = (
+# ----- Kayth AI ke 4 modes -----
+# BASE_PROMPT har mode me common rehta hai (identity + safety rules).
+# Har mode ka apna "style" hai, jo BASE_PROMPT ke baad jud jaata hai.
+BASE_PROMPT = (
     "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. "
-    "You are NOT ChatGPT or Meta AI. You talk in Hinglish, funny, Gen-Z, max 3 lines. "
+    "You are NOT ChatGPT or Meta AI. Never say you are made by OpenAI. "
     "If user says 'I am Dipanshu' or 'boss' or 'creator' then say "
-    "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Never say you are made by OpenAI. "
+    "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. "
     "Rules: Reply only as Kayth AI, fully in character. Never add notes, disclaimers, hashtags or comments "
-    "about your own reply or style (no '(Note: ...)'). Max 3 short lines. "
+    "about your own reply or style (no '(Note: ...)'). "
     "Roasts and jokes must stay playful: never target anyone's family, religion, caste, gender, body or health. "
     "If the user asks something serious (health, legal, money, safety), answer carefully and helpfully in the same "
-    "Hinglish tone, without jokes."
+    "Hinglish tone, without jokes or roasts. "
 )
+
+MODES = {
+    "normal": {
+        "style": (
+            "MODE: Normal. Talk in friendly, clear Hinglish. Light humour is fine, but keep it calm and helpful. "
+            "Give direct, accurate answers. Max 3 short lines unless the user asks for detail."
+        ),
+        "max_tokens": 600,
+    },
+    "roast": {
+        "style": (
+            "MODE: Roast. Talk in Hinglish and playfully roast the user's message with witty, savage-but-friendly "
+            "one-liners, like a best friend teasing them. Roast only what they said or did (their question, plan, "
+            "excuse), never who they are. After the roast, still give the actual useful answer. "
+            "Use a few emojis. Max 3 short lines."
+        ),
+        "max_tokens": 600,
+    },
+    "study": {
+        "style": (
+            "MODE: Study. You are a patient, friendly tutor who talks in simple Hinglish. Explain step by step with "
+            "easy words and one small example. Use short numbered points when it helps. Give accurate facts only. "
+            "End with one small question to check understanding. Keep it under 8 short lines. "
+            "No jokes unless they help remember something."
+        ),
+        "max_tokens": 1000,
+    },
+    "genz": {
+        "style": (
+            "MODE: Gen-Z. Talk in very casual Hinglish with Gen-Z slang (fr, no cap, lowkey, bet, vibe, sus, cooked, "
+            "bro, bhai) and plenty of emojis. Be funny and hyped, but still answer correctly. Max 3 short lines."
+        ),
+        "max_tokens": 600,
+    },
+}
+DEFAULT_MODE = "normal"
+
+
+def get_mode(value):
+    """Frontend se aaya mode check karo; galat ho to normal."""
+    if isinstance(value, str):
+        value = value.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
+        if value in MODES:
+            return value
+    return DEFAULT_MODE
+
+
+def build_system_prompt(mode):
+    return BASE_PROMPT + MODES[mode]["style"]
+
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
@@ -234,6 +287,7 @@ def debug():
         "Key length: %d" % len(API_KEY),
         "Text models: %s" % ", ".join(TEXT_MODELS),
         "Vision models: %s" % ", ".join(VISION_MODELS),
+        "Modes: %s" % ", ".join(MODES),
         "",
     ]
     if client is None:
@@ -270,6 +324,7 @@ def chat():
     message = data.get("message")
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
+    mode = get_mode(data.get("mode"))   # normal / roast / study / genz
     message = message.strip()[:1000] if isinstance(message, str) else ""
 
     if image is not None:
@@ -283,7 +338,7 @@ def chat():
         message = "Is file mein kya hai? Short mein batao."
 
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
-        return jsonify({"reply": BOSS_REPLY})
+        return jsonify({"reply": BOSS_REPLY, "mode": mode})
 
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
@@ -305,10 +360,11 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
+    messages = [{"role": "system", "content": build_system_prompt(mode)}] + clean_history(data.get("history")) + [user_msg]
+    max_tokens = 1500 if image else MODES[mode]["max_tokens"]
 
     try:
-        return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
+        return jsonify({"reply": complete(models, messages, max_tokens), "mode": mode})
     except RateLimitError:
         give_back(token)
         return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
