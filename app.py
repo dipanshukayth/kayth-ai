@@ -50,7 +50,6 @@ Savage but playful.
 Max 3 lines.
 No abuse.
 """
-)
 
 GENZ_PROMPT = """
 You are Kayth AI Gen-Z Mode.
@@ -58,7 +57,6 @@ Use bro, ngl, fr, lowkey, W, L naturally.
 Funny and helpful.
 Max 3 lines.
 """
-)
 
 STUDY_PROMPT = """
 You are Kayth AI Study Mode.
@@ -69,7 +67,6 @@ Reply in Hinglish.
 Max 5 lines.
 """
 
-)
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
