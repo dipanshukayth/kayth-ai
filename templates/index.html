@@ -8,7 +8,12 @@
 <title>Kayth AI 👻</title>
 <link rel="icon" href="data:,">
 <style>
-:root{--y:#FFFC00;--card:#151518;--mut:#8e8e93;--ig:linear-gradient(135deg,#8a3ab9 0%,#e1306c 55%,#fcaf45 100%)}
+:root{--y:#FFFC00;--card:#151518;--mut:#8e8e93;--ig:linear-gradient(135deg,#7a2fa8 0%,#d62b66 55%,#d9631c 100%);--rg:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
+/* mode themes: har mode ka apna rang (--y accent, --ig AI bubble, --rg header ring) */
+body[data-mode="normal"]{--y:#FFFC00;--ig:linear-gradient(135deg,#7a2fa8 0%,#d62b66 55%,#d9631c 100%);--rg:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
+body[data-mode="roast"]{--y:#ff5a36;--ig:linear-gradient(135deg,#a31128 0%,#d92d20 55%,#d9631c 100%);--rg:conic-gradient(#ffb199,#ff5a36,#a31128,#ffb199)}
+body[data-mode="study"]{--y:#3ddc97;--ig:linear-gradient(135deg,#1d3a9e 0%,#1768b8 55%,#12806f 100%);--rg:conic-gradient(#7de3c0,#3ddc97,#1768b8,#7de3c0)}
+body[data-mode="genz"]{--y:#e879f9;--ig:linear-gradient(135deg,#5b23b5 0%,#b035c4 55%,#d93a86 100%);--rg:conic-gradient(#f9a8d4,#e879f9,#7c3aed,#f9a8d4)}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 body{display:flex;justify-content:center}
@@ -21,7 +26,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 header{display:flex;align-items:center;gap:6px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;border-bottom:1px solid #1a1a1a}
 .story{position:relative;width:46px;height:46px;flex:none}
 .ring{position:absolute;inset:0;border-radius:50%;overflow:hidden}
-.ring::before{content:"";position:absolute;inset:-50%;background:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
+.ring::before{content:"";position:absolute;inset:-50%;background:var(--rg)}
 .av{position:absolute;inset:3px;border-radius:50%;background:#000;border:2px solid #000;display:grid;place-items:center;font-weight:800;font-size:18px;background:linear-gradient(#111,#000);z-index:1}
 .dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:var(--y);border:2.5px solid #000;z-index:2}
 .who{flex:1;min-width:0}
@@ -136,7 +141,7 @@ aside.open{transform:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
-<body>
+<body data-mode="normal">
 <div class="app">
   <header>
     <button class="hbtn" id="menu" aria-label="Chats kholo"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
@@ -199,7 +204,13 @@ const OFFLINE = [
   'Server tak pahunch hi nahi paya 😭 thodi der baad try kar.',
   'Arre yaar, beech raste mein message kho gaya 💀 dobara bhej na!'
 ];
-const WELCOME = 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨';
+const MODE_TEXT = {
+  normal: { ph: 'Message bhejo...', hi: 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨' },
+  roast:  { ph: 'Bol, aaj kisko roast karun? 🔥', hi: 'Aa gaya roast khane? 🔥 Bol, aaj kya bakwaas karni hai? Warning: dil pe mat lena 😈' },
+  study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' },
+  genz:   { ph: 'Kya vibe hai? 😎', hi: 'Yooo bro! 😎 Gen-Z mode on, no cap. Bol kya scene hai, fr fr? ✨' }
+};
+const isWelcomeMsg = m => m.r === 'assistant' && (m.w || Object.values(MODE_TEXT).some(x => x.hi === m.c));
 const IMG_LINES = ['Ye lo bhai, fresh fresh 🎨', 'Ban gayi! Kaisi lagi? 😎', 'Dipanshu ke AI ka kamaal 🎨🔥'];
 const SLASH_RE = /^\/(img|image|imagine)\b\s*/i;
 const IMG_WORDS = '(images?|imgs?|photos?|pics?|pictures?|tasveer|tasvir|logo|wallpaper|poster)';
@@ -218,11 +229,17 @@ function setMode(m, announce) {
   if (!MODE_NAMES[m]) return;
   mode = m;
   try { localStorage.setItem(MKEY, m); } catch (e) {}
+  document.body.dataset.mode = m;
+  msg.placeholder = MODE_TEXT[m].ph;
   document.querySelectorAll('.mode').forEach(b => {
     const on = b.dataset.mode === m;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  if (announce) toast(MODE_NAMES[m] + ' mode on ✅');
+  if (announce) {
+    toast(MODE_NAMES[m] + ' mode on ✅');
+    // agar chat me abhi sirf welcome message hai to use naye mode ka bana do
+    if (chat.length === 1 && isWelcomeMsg(chat[0])) { chat.length = 0; renderChat(); }
+  }
 }
 $('#modes').addEventListener('click', e => {
   const b = e.target.closest('.mode'); if (!b || b.dataset.mode === mode) return;
@@ -578,7 +595,7 @@ $('#export').addEventListener('click', () => {
   a.click(); URL.revokeObjectURL(a.href);
 });
 
-function welcome() { const m = { r: 'assistant', c: WELCOME, t: Date.now() }; chat.push(m); add(m); save(); }
+function welcome() { const m = { r: 'assistant', c: MODE_TEXT[mode].hi, t: Date.now(), w: true }; chat.push(m); add(m); save(); }
 
 renderChat(); renderSide();
 setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
