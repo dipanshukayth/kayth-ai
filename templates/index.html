@@ -142,6 +142,20 @@ aside.open{transform:none}
 .gen.ld::after{content:attr(data-note);animation:pulse 1.2s infinite}
 .gen.err::after{content:"Image load nahi hui 😅 tap karke kholo"}
 .note{text-align:center;font-size:11.5px;color:var(--mut);padding:0 14px calc(8px + env(safe-area-inset-bottom))}
+/* voice settings sheet */
+.vscrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30}
+.vsheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100%);max-height:88dvh;overflow-y:auto;background:#0b0f17;border:1px solid #1d2433;border-bottom:0;border-radius:22px 22px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));z-index:31;box-shadow:0 -10px 40px -14px var(--y)}
+.vsheet[hidden],.vscrim[hidden]{display:none}
+.vl{display:block;margin-top:12px;font-size:13.5px;color:#c7c7cc}
+.vl output{float:right;color:var(--y);font-weight:700}
+.vl select{width:100%;margin-top:6px;height:42px;border-radius:12px;background:var(--card);border:1px solid #1d2433;color:#fff;font:inherit;font-size:14.5px;padding:0 10px}
+.vl input[type=range]{width:100%;margin-top:8px;accent-color:var(--y)}
+.vpre{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.vpre button,.vact button{height:36px;padding:0 14px;border-radius:99px;background:var(--card);border:1px solid #1d2433;font-size:13.5px;font-weight:600}
+.vpre button:active,.vact button:active{background:#1a2030}
+.vact{display:flex;gap:8px;margin-top:14px}
+.vact #vtest{background:var(--y);color:#000;border-color:var(--y);flex:1}
+.vnote{margin-top:10px;font-size:12px;color:var(--mut)}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
 @keyframes pulse{50%{opacity:.35}}
@@ -196,11 +210,33 @@ aside.open{transform:none}
   <input id="q" class="sq" type="search" placeholder="Chats dhundho..." autocomplete="off">
   <div id="chats"></div>
   <div class="sf">
+    <button id="vset"><svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>Aawaz settings</button>
     <button id="export"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Is chat ko export karo</button>
     <button id="delall" class="danger"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Saari chats delete karo</button>
   </div>
 </aside>
 <div id="toast" role="status"></div>
+<div class="vscrim" id="vscrim" hidden></div>
+<section class="vsheet" id="vsheet" role="dialog" aria-label="Aawaz settings" hidden>
+  <div class="sh"><b>Aawaz settings 🎙️</b><button class="hbtn" id="vclose" aria-label="Band karo"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <label class="vl">Voice
+    <select id="vvoice"></select>
+  </label>
+  <label class="vl">Speed <output id="vrv">1.00x</output>
+    <input type="range" id="vrate" min="0.6" max="1.6" step="0.05" value="1">
+  </label>
+  <label class="vl">Pitch (patli / gehri) <output id="vpv">1.00</output>
+    <input type="range" id="vpitch" min="0.5" max="1.8" step="0.05" value="1">
+  </label>
+  <div class="vpre" id="vpre">
+    <button data-r="1" data-p="1">Normal</button>
+    <button data-r="0.9" data-p="0.6">Gehri 🗿</button>
+    <button data-r="1.1" data-p="1.6">Patli 🐿️</button>
+    <button data-r="1.4" data-p="1.1">Tez ⚡</button>
+  </div>
+  <div class="vact"><button id="vtest">▶ Suno</button><button id="vreset">Reset</button></div>
+  <p class="vnote" id="vnote"></p>
+</section>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -404,18 +440,82 @@ function sync() { foot.classList.toggle('has', !!msg.value.trim() || !!pendingIm
 
 /* ---------- text to speech ---------- */
 function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const VKEY = 'kayth_voice_v1';
+let voiceCfg = { name: '', rate: 1, pitch: 1 };
+try {
+  const v = JSON.parse(localStorage.getItem(VKEY));
+  if (v && typeof v === 'object') {
+    voiceCfg.name = typeof v.name === 'string' ? v.name : '';
+    voiceCfg.rate = clamp(+v.rate || 1, 0.6, 1.6);
+    voiceCfg.pitch = clamp(+v.pitch || 1, 0.5, 1.8);
+  }
+} catch (e) {}
+const saveVoice = () => { try { localStorage.setItem(VKEY, JSON.stringify(voiceCfg)); } catch (e) {} };
+
+function chosenVoice() {
+  const all = speechSynthesis.getVoices();
+  return (voiceCfg.name && all.find(x => x.name === voiceCfg.name)) || all.find(x => x.lang === 'hi-IN') || all.find(x => x.lang === 'en-IN') || null;
+}
+function makeUtt(text) {
+  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
+  const v = chosenVoice();
+  u.lang = v ? v.lang : 'hi-IN';
+  if (v) u.voice = v;
+  u.rate = voiceCfg.rate; u.pitch = voiceCfg.pitch;
+  return u;
+}
 function speak(text, btn) {
   if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
   if (btn.classList.contains('on')) return stopSpeak();
   stopSpeak();
-  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
-  u.lang = 'hi-IN';
-  const v = speechSynthesis.getVoices().find(x => x.lang === 'hi-IN') || speechSynthesis.getVoices().find(x => x.lang === 'en-IN');
-  if (v) u.voice = v;
+  const u = makeUtt(text);
   u.onend = u.onerror = () => btn.classList.remove('on');
   btn.classList.add('on'); speechSynthesis.speak(u);
 }
 if ('speechSynthesis' in window) speechSynthesis.getVoices();
+
+/* ---------- voice settings (user apni aawaz chune) ---------- */
+const vsheet = $('#vsheet'), vscrim = $('#vscrim'), vvoice = $('#vvoice'), vrate = $('#vrate'), vpitch = $('#vpitch');
+function fillVoices() {
+  if (!('speechSynthesis' in window)) { $('#vnote').textContent = 'Is browser mein aawaz support nahi hai.'; return; }
+  const all = [...speechSynthesis.getVoices()];
+  const rank = v => /^hi/i.test(v.lang) ? 0 : /^en-IN/i.test(v.lang) ? 1 : /^en/i.test(v.lang) ? 2 : 3;
+  all.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  vvoice.innerHTML = '';
+  const auto = document.createElement('option'); auto.value = ''; auto.textContent = 'Auto (Hindi / Indian English)'; vvoice.append(auto);
+  all.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name + ' (' + v.lang + ')'; vvoice.append(o); });
+  vvoice.value = all.some(v => v.name === voiceCfg.name) ? voiceCfg.name : '';
+  $('#vnote').textContent = all.length
+    ? all.length + ' aawazein mili. Ye list tumhare phone ya browser par depend karti hai.'
+    : 'Abhi koi aawaz nahi mili, thodi der baad phir kholo.';
+}
+function syncVoiceUI() {
+  vrate.value = voiceCfg.rate; vpitch.value = voiceCfg.pitch;
+  $('#vrv').textContent = (+voiceCfg.rate).toFixed(2) + 'x'; $('#vpv').textContent = (+voiceCfg.pitch).toFixed(2);
+}
+function openVoice() { closeSide(); fillVoices(); syncVoiceUI(); vscrim.hidden = false; vsheet.hidden = false; }
+function closeVoice() { if (vsheet.hidden) return; vsheet.hidden = true; vscrim.hidden = true; stopSpeak(); }
+$('#vset').addEventListener('click', openVoice);
+$('#vclose').addEventListener('click', closeVoice);
+vscrim.addEventListener('click', closeVoice);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVoice(); });
+if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', () => { if (!vsheet.hidden) fillVoices(); });
+vvoice.addEventListener('change', () => { voiceCfg.name = vvoice.value; saveVoice(); });
+vrate.addEventListener('input', () => { voiceCfg.rate = +vrate.value; syncVoiceUI(); saveVoice(); });
+vpitch.addEventListener('input', () => { voiceCfg.pitch = +vpitch.value; syncVoiceUI(); saveVoice(); });
+$('#vpre').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  voiceCfg.rate = +b.dataset.r; voiceCfg.pitch = +b.dataset.p; syncVoiceUI(); saveVoice();
+});
+$('#vtest').addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
+  stopSpeak();
+  const v = chosenVoice();
+  const hindi = !v || /^hi/i.test(v.lang);
+  speechSynthesis.speak(makeUtt(hindi ? 'नमस्ते! मैं काइथ ए आई हूँ। मेरी आवाज़ ऐसी है, कैसी लगी?' : 'Hello! I am Kayth AI. This is how my voice sounds. How do you like it?'));
+});
+$('#vreset').addEventListener('click', () => { voiceCfg = { name: '', rate: 1, pitch: 1 }; saveVoice(); fillVoices(); syncVoiceUI(); toast('Aawaz reset ho gayi ✅'); });
 
 /* ---------- voice (hold to record) ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
