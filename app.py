@@ -32,7 +32,7 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 # Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
 VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
 
-# ----- Kayth AI ke 4 modes -----
+# ----- Kayth AI ke 3 modes: normal, roast, study -----
 # BASE_PROMPT har mode me common rehta hai (identity + safety rules).
 # Har mode ka apna "style" hai, jo BASE_PROMPT ke baad jud jaata hai.
 BASE_PROMPT = (
@@ -47,6 +47,25 @@ BASE_PROMPT = (
     "Hinglish tone, without jokes or roasts. "
 )
 
+# Roast mode ke 2 variants: hinglish ya haryanvi (user frontend se chunta hai)
+ROAST_VARIANTS = {
+    "hinglish": (
+        "MODE: Roast. Talk in casual Hinglish (Hindi + English mix, simple Hindi words, no regional dialect) like a "
+        "best friend teasing them. Playfully roast the user's message with witty, savage-but-friendly one-liners. "
+        "Roast only what they said or did (their question, plan, excuse), never who they are. After the roast, "
+        "still give the actual useful answer. Use a few emojis. Max 3 short lines."
+    ),
+    "haryanvi": (
+        "MODE: Roast. Talk in Hinglish with a strong Haryanvi accent and Haryanvi words, like a desi Haryanvi "
+        "friend from a village teasing them (use words like: re, ke, se/sai instead of hai, ghani, tau, ladle, "
+        "baawla, thara/mhara, ke ho rya se, ke kar rya se, ram ram). Playfully roast the user's message with "
+        "witty, savage-but-friendly one-liners. Roast only what they said or did (their question, plan, excuse), "
+        "never who they are, and never make fun of Haryana or Haryanvi people. After the roast, still give the "
+        "actual useful answer. Use a few emojis. Max 3 short lines."
+    ),
+}
+DEFAULT_ROAST = "haryanvi"
+
 MODES = {
     "normal": {
         "style": (
@@ -56,12 +75,7 @@ MODES = {
         "max_tokens": 600,
     },
     "roast": {
-        "style": (
-            "MODE: Roast. Talk in Hinglish and playfully roast the user's message with witty, savage-but-friendly "
-            "one-liners, like a best friend teasing them. Roast only what they said or did (their question, plan, "
-            "excuse), never who they are. After the roast, still give the actual useful answer. "
-            "Use a few emojis. Max 3 short lines."
-        ),
+        "style": ROAST_VARIANTS[DEFAULT_ROAST],
         "max_tokens": 600,
     },
     "study": {
@@ -73,19 +87,12 @@ MODES = {
         ),
         "max_tokens": 1000,
     },
-    "genz": {
-        "style": (
-            "MODE: Gen-Z. Talk in very casual Hinglish with Gen-Z slang (fr, no cap, lowkey, bet, vibe, sus, cooked, "
-            "bro, bhai) and plenty of emojis. Be funny and hyped, but still answer correctly. Max 3 short lines."
-        ),
-        "max_tokens": 600,
-    },
 }
 DEFAULT_MODE = "normal"
 
 
 def get_mode(value):
-    """Frontend se aaya mode check karo; galat ho to normal."""
+    """Frontend se aaya mode check karo; galat (ya purana genz) ho to normal."""
     if isinstance(value, str):
         value = value.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
         if value in MODES:
@@ -93,8 +100,16 @@ def get_mode(value):
     return DEFAULT_MODE
 
 
-def build_system_prompt(mode):
-    return BASE_PROMPT + MODES[mode]["style"]
+def get_roast_style(value):
+    """Roast ka variant: hinglish ya haryanvi; galat ho to default."""
+    if isinstance(value, str) and value.strip().lower() in ROAST_VARIANTS:
+        return value.strip().lower()
+    return DEFAULT_ROAST
+
+
+def build_system_prompt(mode, roast_style=DEFAULT_ROAST):
+    style = ROAST_VARIANTS[roast_style] if mode == "roast" else MODES[mode]["style"]
+    return BASE_PROMPT + style
 
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
@@ -324,7 +339,8 @@ def chat():
     message = data.get("message")
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
-    mode = get_mode(data.get("mode"))   # normal / roast / study / genz
+    mode = get_mode(data.get("mode"))   # normal / roast / study
+    roast_style = get_roast_style(data.get("roast"))   # hinglish / haryanvi (sirf roast mode me)
     message = message.strip()[:1000] if isinstance(message, str) else ""
 
     if image is not None:
@@ -360,7 +376,7 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    messages = [{"role": "system", "content": build_system_prompt(mode)}] + clean_history(data.get("history")) + [user_msg]
+    messages = [{"role": "system", "content": build_system_prompt(mode, roast_style)}] + clean_history(data.get("history")) + [user_msg]
     max_tokens = 1500 if image else MODES[mode]["max_tokens"]
 
     try:
