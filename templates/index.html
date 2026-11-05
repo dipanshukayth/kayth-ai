@@ -13,7 +13,7 @@
 body[data-mode="normal"]{--y:#FFFC00;--ig:linear-gradient(135deg,#7a2fa8 0%,#d62b66 55%,#d9631c 100%);--rg:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
 body[data-mode="roast"]{--y:#ff5a36;--ig:linear-gradient(135deg,#a31128 0%,#d92d20 55%,#d9631c 100%);--rg:conic-gradient(#ffb199,#ff5a36,#a31128,#ffb199)}
 body[data-mode="study"]{--y:#3ddc97;--ig:linear-gradient(135deg,#1d3a9e 0%,#1768b8 55%,#12806f 100%);--rg:conic-gradient(#7de3c0,#3ddc97,#1768b8,#7de3c0)}
-body[data-mode="genz"]{--y:#e879f9;--ig:linear-gradient(135deg,#5b23b5 0%,#b035c4 55%,#d93a86 100%);--rg:conic-gradient(#f9a8d4,#e879f9,#7c3aed,#f9a8d4)}
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 body{display:flex;justify-content:center}
@@ -43,6 +43,13 @@ body.busy .ring::before{animation:spin 1.1s linear infinite}
 .mode{flex:none;display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:99px;background:var(--card);border:1px solid #232327;color:#c7c7cc;font-size:13.5px;font-weight:600;white-space:nowrap}
 .mode:active{background:#1f1f24}
 .mode.on{background:var(--y);color:#000;border-color:var(--y)}
+
+/* roast sub-options (2 columns: Hinglish | Haryanvi) */
+.subs{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid #1a1a1a}
+.subs[hidden]{display:none}
+.sub{flex:1;height:34px;border-radius:12px;background:var(--card);border:1px solid #232327;color:#c7c7cc;font-size:13.5px;font-weight:600;text-align:center}
+.sub:active{background:#1f1f24}
+.sub.on{border-color:var(--y);color:var(--y);background:#1b1b1f}
 
 /* chat */
 #chat{flex:1;overflow-y:auto;padding:12px 14px 6px;scrollbar-width:thin;scrollbar-color:#222 transparent;overscroll-behavior:contain}
@@ -155,8 +162,11 @@ aside.open{transform:none}
     <button class="mode" data-mode="normal" aria-pressed="true">😊 Normal</button>
     <button class="mode" data-mode="roast" aria-pressed="false">🔥 Roast</button>
     <button class="mode" data-mode="study" aria-pressed="false">📚 Study</button>
-    <button class="mode" data-mode="genz" aria-pressed="false">😎 Gen-Z</button>
   </nav>
+  <div class="subs" id="subs" role="group" aria-label="Roast ka style" hidden>
+    <button class="sub" data-rs="hinglish" aria-pressed="false">Hinglish</button>
+    <button class="sub" data-rs="haryanvi" aria-pressed="true">Haryanvi 🌾</button>
+  </div>
 
   <main id="chat">
     <div class="chip"><i></i>Kayth AI was active now</div>
@@ -206,11 +216,14 @@ const OFFLINE = [
 ];
 const MODE_TEXT = {
   normal: { ph: 'Message bhejo...', hi: 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨' },
-  roast:  { ph: 'Bol, aaj kisko roast karun? 🔥', hi: 'Aa gaya roast khane? 🔥 Bol, aaj kya bakwaas karni hai? Warning: dil pe mat lena 😈' },
-  study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' },
-  genz:   { ph: 'Kya vibe hai? 😎', hi: 'Yooo bro! 😎 Gen-Z mode on, no cap. Bol kya scene hai, fr fr? ✨' }
+  study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' }
 };
-const isWelcomeMsg = m => m.r === 'assistant' && (m.w || Object.values(MODE_TEXT).some(x => x.hi === m.c));
+const ROAST_TEXT = {
+  hinglish: { ph: 'Bol, aaj kisko roast karun? 🔥', hi: 'Aa gaya roast khane? 🔥 Bol, aaj kya bakwaas karni hai? Warning: dil pe mat lena 😈' },
+  haryanvi: { ph: 'Bol re, aaj kisne roast karna se? 🔥', hi: 'Ram Ram re! 🔥 Roast mode chaalu se. Bol, aaj ke bakwaas karni se? Dil pe mat lyio hau 😈' }
+};
+const modeText = m => m === 'roast' ? ROAST_TEXT[roastStyle] : MODE_TEXT[m];
+const isWelcomeMsg = m => m.r === 'assistant' && (m.w || [...Object.values(MODE_TEXT), ...Object.values(ROAST_TEXT)].some(x => x.hi === m.c));
 const IMG_LINES = ['Ye lo bhai, fresh fresh 🎨', 'Ban gayi! Kaisi lagi? 😎', 'Dipanshu ke AI ka kamaal 🎨🔥'];
 const SLASH_RE = /^\/(img|image|imagine)\b\s*/i;
 const IMG_WORDS = '(images?|imgs?|photos?|pics?|pictures?|tasveer|tasvir|logo|wallpaper|poster)';
@@ -222,15 +235,36 @@ const HOWTO_RE = /\b(kaise|how to|how do|explain|samjha|kya hota|kya hai)\b|क�
 
 /* ---------- modes (normal / roast / study / genz) ---------- */
 const MKEY = 'kayth_mode_v1';
-const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study', genz: 'Gen-Z' };
+const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study' };
 let mode = 'normal';
 try { const saved = localStorage.getItem(MKEY); if (MODE_NAMES[saved]) mode = saved; } catch (e) {}
+const RKEY = 'kayth_roast_v1';
+const ROAST_NAMES = { hinglish: 'Hinglish', haryanvi: 'Haryanvi' };
+let roastStyle = 'haryanvi';
+try { const r = localStorage.getItem(RKEY); if (ROAST_NAMES[r]) roastStyle = r; } catch (e) {}
+function applyText() { msg.placeholder = modeText(mode).ph; $('#subs').hidden = mode !== 'roast'; }
+function refreshWelcome() { if (chat.length === 1 && isWelcomeMsg(chat[0])) { chat.length = 0; renderChat(); } }
+function setRoast(r, announce) {
+  if (!ROAST_NAMES[r]) return;
+  roastStyle = r;
+  try { localStorage.setItem(RKEY, r); } catch (e) {}
+  document.querySelectorAll('.sub').forEach(b => {
+    const on = b.dataset.rs === r;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  applyText();
+  if (announce) { toast('Roast: ' + ROAST_NAMES[r] + ' ✅'); refreshWelcome(); }
+}
+$('#subs').addEventListener('click', e => {
+  const b = e.target.closest('.sub'); if (!b || b.dataset.rs === roastStyle) return;
+  setRoast(b.dataset.rs, true);
+});
 function setMode(m, announce) {
   if (!MODE_NAMES[m]) return;
   mode = m;
   try { localStorage.setItem(MKEY, m); } catch (e) {}
   document.body.dataset.mode = m;
-  msg.placeholder = MODE_TEXT[m].ph;
+  applyText();
   document.querySelectorAll('.mode').forEach(b => {
     const on = b.dataset.mode === m;
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -238,7 +272,7 @@ function setMode(m, announce) {
   if (announce) {
     toast(MODE_NAMES[m] + ' mode on ✅');
     // agar chat me abhi sirf welcome message hai to use naye mode ka bana do
-    if (chat.length === 1 && isWelcomeMsg(chat[0])) { chat.length = 0; renderChat(); }
+    refreshWelcome();
   }
 }
 $('#modes').addEventListener('click', e => {
@@ -276,6 +310,7 @@ let toastT;
 function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2400); }
 
 setMode(mode, false);
+setRoast(roastStyle, false);
 
 /* ---------- render ---------- */
 function setTicks(el, s) { el.className = 'tk ' + s; el.innerHTML = s === 'sent' ? TICK1 : TICK2; }
@@ -350,7 +385,7 @@ async function send(text) {
 
   let reply = '', gen = null;
   try {
-    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att, mode }) });
+    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att, mode, roast: roastStyle }) });
     const d = await res.json(); reply = d.reply || ''; if (d.url) gen = { url: d.url, prompt: d.prompt || '' };
     if (d.err) console.warn('Kayth AI error:', d.err);
   } catch (e) {}
@@ -595,7 +630,7 @@ $('#export').addEventListener('click', () => {
   a.click(); URL.revokeObjectURL(a.href);
 });
 
-function welcome() { const m = { r: 'assistant', c: MODE_TEXT[mode].hi, t: Date.now(), w: true }; chat.push(m); add(m); save(); }
+function welcome() { const m = { r: 'assistant', c: modeText(mode).hi, t: Date.now(), w: true }; chat.push(m); add(m); save(); }
 
 renderChat(); renderSide();
 setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
