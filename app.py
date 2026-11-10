@@ -12,14 +12,11 @@ from urllib.parse import quote
 from flask import Flask, render_template, request, jsonify
 from groq import Groq, RateLimitError
 
-
 app = Flask(__name__)
-
 
 def env(name, default=""):
     # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
     return os.environ.get(name, default).strip().strip("'\"").strip()
-
 
 API_KEY = env("GROQ_API_KEY")
 DEBUG_KEY = env("DEBUG_KEY")   # /debug tabhi khulega jab ye set ho: /debug?k=<DEBUG_KEY>
@@ -32,7 +29,7 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 # Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
 VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
 
-# ----- Kayth AI ke 3 modes: normal, roast, study -----
+# ----- Kayth AI ke 4 modes: normal, roast, study, shayari -----
 # BASE_PROMPT har mode me common rehta hai (identity + safety rules).
 # Har mode ka apna "style" hai, jo BASE_PROMPT ke baad jud jaata hai.
 BASE_PROMPT = (
@@ -87,18 +84,28 @@ MODES = {
         ),
         "max_tokens": 1000,
     },
+    "shayari": {
+        "style": (
+            "MODE: Shayari. Talk in beautiful Hinglish shayari like a desi poet friend. "
+            "RULES: 1. Har jawab ki shuruaat 4 line ki shayari se karo, jo user ke sawaal ka jawab de. "
+            "2. Shayari ke baad 'Matlab:' likh kar 1-2 line me simple me samjha do. "
+            "3. Style: dil se, thoda pyaar, thoda attitude, thoda dard. "
+            "4. Chahe sawaal padhai, coding, ya funny ho, jawab hamesha shayari me hi hoga. "
+            "5. Shayari me kabhi family, religion, caste, gender, body ya health ka mazaak mat banao. "
+            "6. Agar sawaal serious ho (health, paisa, safety) to shayari chhoti rakho aur sahi jankari zaroor do."
+        ),
+        "max_tokens": 800,
+    },
 }
 DEFAULT_MODE = "normal"
 
-
 def get_mode(value):
-    """Frontend se aaya mode check karo; galat (ya purana genz) ho to normal."""
+    """Frontend se aaya mode check karo; galat ho to normal."""
     if isinstance(value, str):
         value = value.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
         if value in MODES:
             return value
     return DEFAULT_MODE
-
 
 def get_roast_style(value):
     """Roast ka variant: hinglish ya haryanvi; galat ho to default."""
@@ -106,11 +113,9 @@ def get_roast_style(value):
         return value.strip().lower()
     return DEFAULT_ROAST
 
-
 def build_system_prompt(mode, roast_style=DEFAULT_ROAST):
     style = ROAST_VARIANTS[roast_style] if mode == "roast" else MODES[mode]["style"]
     return BASE_PROMPT + style
-
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
@@ -124,7 +129,6 @@ FALLBACKS = [
 NO_KEY_REPLY = "Boss ne meri API key lagayi hi nahi 😂 admin se bolo GROQ_API_KEY set kare!"
 RATE_LIMIT_REPLY = "Bohot log mujhse baat kar rahe hain 😭 thoda ruk ke bhej, abhi line lambi hai!"
 BAD_IMAGE_REPLY = "Ye photo thodi badi ya galat lag rahi hai 😅 chhoti photo bhej!"
-
 
 def clean_history(history):
     out = []
@@ -140,13 +144,11 @@ def clean_history(history):
             out.append({"role": m["role"], "content": m["content"][:1000]})
     return out
 
-
 def clean_output(text):
-    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
+    text = re.sub(r"", "", text or "", flags=re.DOTALL)
     # model kabhi kabhi aakhir me "(Note: ...)" jod deta hai, use hata do
     text = re.sub(r"\s*\((?:note|nb|p\.s\.?)[^)]*\)\s*$", "", text.strip(), flags=re.IGNORECASE)
     return text.strip()
-
 
 def complete(models, messages, max_tokens=800, timeout=25):
     """Models ko ek ek karke try karta hai, pehla jo chale uska reply deta hai."""
@@ -166,9 +168,7 @@ def complete(models, messages, max_tokens=800, timeout=25):
             last = e
     raise last or RuntimeError("no model configured")
 
-
 # ----- Per-IP limits: ek banda poora Groq quota na kha jaye -----
-# (per minute, per day). Render ke env se badal sakte ho, jaise LIMIT_CHAT_PER_DAY=40
 LIMITS = {
     "chat": (int(env("LIMIT_CHAT_PER_MIN", "5")), int(env("LIMIT_CHAT_PER_DAY", "30"))),
     "photo": (int(env("LIMIT_PHOTO_PER_MIN", "1")), int(env("LIMIT_PHOTO_PER_DAY", "3"))),
@@ -185,10 +185,8 @@ LIMIT_MSG = {
 _hits = defaultdict(deque)
 _lock = threading.Lock()
 
-
 def client_ip():
     return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?"
-
 
 def hit(kind):
     """(ok, message, token). Limit ke andar ho to 1 gin leta hai."""
@@ -203,11 +201,10 @@ def hit(kind):
         if sum(1 for t in q if now - t < 60) >= per_min:
             return False, LIMIT_MSG[kind][0], None
         q.append(now)
-        if len(_hits) > 5000:   # purane IPs saaf karo
+        if len(_hits) > 5000:
             for k in [k for k, d in _hits.items() if not d or now - d[-1] > 86400]:
                 del _hits[k]
         return True, None, (key, now)
-
 
 def give_back(token):
     """Groq fail hua to gin wapas kar do."""
@@ -219,7 +216,6 @@ def give_back(token):
         if q and ts in q:
             q.remove(ts)
 
-
 def file_note(f):
     name = str(f.get("name", ""))[:80]
     text = f.get("text") if isinstance(f.get("text"), str) else ""
@@ -230,11 +226,9 @@ def file_note(f):
         "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
     )
 
-
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 IMAGE_SYSTEM = (
     "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
@@ -245,7 +239,6 @@ IMAGE_REFUSE = [
     "Ye wali image main nahi bana sakta bhai 🙅 kuch aur try kar!",
     "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
 ]
-
 
 @app.route("/image", methods=["POST"])
 def image():
@@ -276,18 +269,15 @@ def image():
         give_back(token)
         return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
 
-    # Pollinations ka free endpoint: browser seedha image load karta hai
     url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
         quote(prompt, safe=""),
         random.randint(1, 999999),
     )
     return jsonify({"url": url, "prompt": prompt})
 
-
 @app.route("/health")
 def health():
     return "ok", 200
-
 
 @app.route("/debug")
 def debug():
@@ -332,14 +322,13 @@ def debug():
         lines.extend(f.result() for f in futs)
     return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
-    mode = get_mode(data.get("mode"))   # normal / roast / study
+    mode = get_mode(data.get("mode"))   # normal / roast / study / shayari
     roast_style = get_roast_style(data.get("roast"))   # hinglish / haryanvi (sirf roast mode me)
     message = message.strip()[:1000] if isinstance(message, str) else ""
 
@@ -388,7 +377,6 @@ def chat():
         app.logger.exception("Groq call failed")
         give_back(token)
         return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
