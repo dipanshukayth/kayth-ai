@@ -6,13 +6,14 @@
 <meta name="theme-color" content="#05070c">
 <meta name="color-scheme" content="dark">
 <title>Kayth AI ✦</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="data:,[STRIPPED]
 <style>
 :root{--y:#22d3ee;--card:#0d1119;--mut:#8a93a6;--ig:linear-gradient(135deg,rgba(34,211,238,.18),rgba(139,92,246,.16));--rg:conic-gradient(#22d3ee,#8b5cf6,#22d3ee)}
 /* mode themes: --y accent, --ig AI bubble tint, --rg header orb */
 body[data-mode="normal"]{--y:#22d3ee;--ig:linear-gradient(135deg,rgba(34,211,238,.18),rgba(139,92,246,.16));--rg:conic-gradient(#22d3ee,#8b5cf6,#22d3ee)}
 body[data-mode="roast"]{--y:#ff6a3d;--ig:linear-gradient(135deg,rgba(255,106,61,.20),rgba(220,38,38,.14));--rg:conic-gradient(#ffb199,#ff6a3d,#b91c1c,#ffb199)}
 body[data-mode="study"]{--y:#34d399;--ig:linear-gradient(135deg,rgba(52,211,153,.18),rgba(59,130,246,.15));--rg:conic-gradient(#6ee7b7,#34d399,#3b82f6,#6ee7b7)}
+body[data-mode="shayari"]{--y:#f472b6;--ig:linear-gradient(135deg,rgba(244,114,182,.22),rgba(168,85,247,.18));--rg:conic-gradient(#f9a8d4,#f472b6,#a855f7,#f9a8d4)}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#05070c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
@@ -177,6 +178,7 @@ aside.open{transform:none}
     <button class="mode" data-mode="normal" aria-pressed="true">😊 Normal</button>
     <button class="mode" data-mode="roast" aria-pressed="false">🔥 Roast</button>
     <button class="mode" data-mode="study" aria-pressed="false">📚 Study</button>
+    <button class="mode" data-mode="shayari" aria-pressed="false">❤️ Shayari</button>
   </nav>
   <div class="subs" id="subs" role="group" aria-label="Roast ka style" hidden>
     <button class="sub" data-rs="hinglish" aria-pressed="false">Hinglish</button>
@@ -253,7 +255,8 @@ const OFFLINE = [
 ];
 const MODE_TEXT = {
   normal: { ph: 'Message bhejo...', hi: 'Yo! Kayth AI here ⚡ Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨' },
-  study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' }
+  study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' },
+  shayari: { ph: 'Dil ki baat likh de... ❤️', hi: 'Aaj dil se baat hogi ❤️ Shayari mode on hai. Bol, kis baat pe shayari sunni hai?' }
 };
 const ROAST_TEXT = {
   hinglish: { ph: 'Bol, aaj kisko roast karun? 🔥', hi: 'Aa gaya roast khane? 🔥 Bol, aaj kya bakwaas karni hai? Warning: dil pe mat lena 😈' },
@@ -270,9 +273,9 @@ const DEV_RE = /(इमेज|फोटो|फ़ोटो|तस्वीर|�
 const DRAW_RE = /^(draw|paint|sketch|imagine)\b/i;
 const HOWTO_RE = /\b(kaise|how to|how do|explain|samjha|kya hota|kya hai)\b|कैसे/i;
 
-/* ---------- modes (normal / roast / study / genz) ---------- */
+/* ---------- modes (normal / roast / study / shayari) ---------- */
 const MKEY = 'kayth_mode_v1';
-const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study' };
+const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study', shayari: 'Shayari' };
 let mode = 'normal';
 try { const saved = localStorage.getItem(MKEY); if (MODE_NAMES[saved]) mode = saved; } catch (e) {}
 const RKEY = 'kayth_roast_v1';
@@ -308,7 +311,6 @@ function setMode(m, announce) {
   });
   if (announce) {
     toast(MODE_NAMES[m] + ' mode on ✅');
-    // agar chat me abhi sirf welcome message hai to use naye mode ka bana do
     refreshWelcome();
   }
 }
