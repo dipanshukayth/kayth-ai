@@ -1,554 +1,344 @@
-<!DOCTYPE html>
-<html lang="hi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#000000">
-<meta name="color-scheme" content="dark">
-<title>Kayth AI 👻</title>
-<link rel="icon" href="data:,">
-<style>
-:root{--y:#FFFC00;--card:#151518;--mut:#8e8e93;--ig:linear-gradient(135deg,#8a3ab9 0%,#e1306c 55%,#fcaf45 100%)}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-body{display:flex;justify-content:center}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offset:2px}
-.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.app{width:100%;max-width:720px;height:100%;height:100dvh;display:flex;flex-direction:column;border-inline:1px solid #151515}
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+import os
+import random
+import re
+import threading
+import time
+from collections eimport defaultdict, deque
+from urllib.parse import quote
 
-/* header */
-header{display:flex;align-items:center;gap:6px;padding:calc(10px + env(safe-area-inset-top)) 10px 10px;border-bottom:1px solid #1a1a1a}
-.story{position:relative;width:46px;height:46px;flex:none}
-.ring{position:absolute;inset:0;border-radius:50%;overflow:hidden}
-.ring::before{content:"";position:absolute;inset:-50%;background:conic-gradient(#fcaf45,#e1306c,#8a3ab9,#fcaf45)}
-.av{position:absolute;inset:3px;border-radius:50%;background:#000;border:2px solid #000;display:grid;place-items:center;font-weight:800;font-size:18px;background:linear-gradient(#111,#000);z-index:1}
-.dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:var(--y);border:2.5px solid #000;z-index:2}
-.who{flex:1;min-width:0}
-.who b{display:block;font-size:17px;font-weight:800;letter-spacing:-.3px}
-.who small{display:block;font-size:12.5px;color:var(--mut);margin-top:1px}
-.who small.on{color:var(--y)}
-.hbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#c7c7cc}
-.hbtn:active{background:#1c1c1e}
-body.busy .ring::before{animation:spin 1.1s linear infinite}
+from flask import Flask, render_template, request, jsonify
+from groq import Groq, RateLimitError
 
-/* chat */
-#chat{flex:1;overflow-y:auto;padding:12px 14px 6px;scrollbar-width:thin;scrollbar-color:#222 transparent;overscroll-behavior:contain}
-.chip{width:max-content;margin:2px auto 14px;display:flex;align-items:center;gap:7px;font-size:12.5px;color:#b5b5ba;padding:6px 12px;border-radius:99px;background:var(--card)}
-.chip i{width:8px;height:8px;border-radius:50%;background:var(--y)}
-.row{display:flex;margin:5px 0}
-.row.user{justify-content:flex-end}
-.b{max-width:82%;padding:9px 13px 6px;border-radius:20px;font-size:15.5px;line-height:1.4;word-break:break-word}
-.row.ai .b{background:var(--ig);border-bottom-left-radius:6px}
-.row.user .b{background:var(--y);color:#000;border-bottom-right-radius:6px}
-.t{white-space:pre-wrap}
-.meta{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:3px;font-size:11px;opacity:.8;min-height:18px}
-.row.ai .meta{opacity:.9}
-.spk{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;margin-right:auto;background:rgba(0,0,0,.25)}
-.spk .i{width:14px;height:14px}
-.spk.on{background:#fff;color:#c13584;animation:pulse 1s infinite}
-.tk .i{width:16px;height:16px;stroke-width:2.4}
-.tk{display:inline-flex;color:rgba(0,0,0,.5)}
-.tk.seen{color:#0a66ff}
-.typing .b{background:var(--card);display:flex;align-items:center;gap:10px;padding:11px 14px;color:#b5b5ba;font-size:13.5px}
-.dots{display:flex;gap:4px}
-.dots i{width:7px;height:7px;border-radius:50%;background:#b5b5ba;animation:bounce 1.2s infinite}
-.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
 
-/* input */
-footer{display:flex;align-items:center;gap:10px;padding:8px 12px 6px;position:relative}
-.pill{flex:1;position:relative;display:flex;align-items:center;gap:4px;height:48px;padding:0 6px;border-radius:99px;background:var(--card);border:1px solid #232327}
-.pill:focus-within{border-color:#3a3a3f}
-.pill .ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#c7c7cc}
-.pill .ic:active{background:#222}
-#msg{flex:1;min-width:0;height:100%;background:none;border:0;outline:0;color:#fff;font:inherit;font-size:16px;padding:0 6px}
-#msg::placeholder{color:#6e6e73}
-#msg:focus-visible{outline:0}
-#act{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid #232327;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;position:relative;transition:background .15s,color .15s}
-#act .snd{display:none}
-footer.has #act{background:var(--y);color:#000;border-color:var(--y)}
-footer.has #act .mic{display:none}
-footer.has #act .snd{display:block}
-#act.rec{background:#ff2d3d;border-color:#ff2d3d;color:#fff;animation:ripple 1.1s infinite;transform:scale(1.12)}
-.recbar{position:absolute;inset:0;border-radius:99px;background:#1d0709;border:1px solid #5a1219;display:none;align-items:center;gap:10px;padding:0 16px;font-size:14px;color:#ffb3b9;overflow:hidden}
-.recbar.show{display:flex}
-.recbar i{width:11px;height:11px;border-radius:50%;background:#ff2d3d;flex:none;animation:pulse 1s infinite}
-.recbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.recbar.cancel{background:#222;border-color:#444;color:#ddd}
-.recbar.cancel i{background:#888;animation:none}
-#toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translate(-50%,10px);background:#2a2a2e;color:#fff;font-size:13.5px;padding:9px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:.2s;max-width:90vw;text-align:center;z-index:40}
-#toast.show{opacity:1;transform:translate(-50%,0)}
+app = Flask(__name__)
 
-.prev{position:absolute;left:12px;bottom:100%;display:none;align-items:center;gap:8px;padding:6px;border-radius:16px;background:var(--card);border:1px solid #232327}
-.prev.show{display:flex}
-.prev img{width:56px;height:56px;object-fit:cover;border-radius:10px}
-.prev button{width:26px;height:26px;border-radius:50%;background:#2a2a2e;display:grid;place-items:center}
-.prev button .i{width:14px;height:14px}
-.b img{display:block;max-width:100%;max-height:260px;border-radius:12px;margin-bottom:6px}
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
-.scrim.show{opacity:1;pointer-events:auto}
-aside{position:fixed;top:0;bottom:0;left:0;width:min(320px,86vw);background:#0c0c0f;border-right:1px solid #1d1d20;z-index:21;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .22s ease;padding:calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom))}
-aside.open{transform:none}
-.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.sh b{font-size:20px;font-weight:800;letter-spacing:-.3px;padding-left:4px}
-.newbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:99px;background:var(--y);color:#000;font-weight:700;font-size:15.5px}
-.sq{width:100%;height:40px;border-radius:99px;background:var(--card);border:1px solid #232327;color:#fff;font:inherit;font-size:15px;padding:0 14px;margin:10px 0 8px}
-.sq::placeholder{color:#6e6e73}
-#chats{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#222 transparent}
-.ci{display:flex;align-items:center;border-radius:14px;margin-bottom:2px}
-.ci:hover,.ci.on{background:#18181c}
-.ci.on .co b{color:var(--y)}
-.co{flex:1;min-width:0;text-align:left;padding:10px 8px 10px 12px}
-.co b,.co small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.co b{font-size:14.5px;font-weight:600}
-.co small{font-size:12px;color:var(--mut);margin-top:2px}
-.ca{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#8e8e93;flex:none}
-.ca:hover,.ca:focus-visible{color:#fff;background:#26262b}
-.ca.del:hover{color:#ff6b75}
-.ca .i{width:17px;height:17px}
-.empty{color:var(--mut);font-size:14px;text-align:center;padding:24px 0}
-.sf{border-top:1px solid #1d1d20;padding-top:8px;margin-top:6px}
-.sf button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;border-radius:12px;color:#c7c7cc;font-size:14px;text-align:left}
-.sf button:active{background:#1c1c1e}
-.sf .danger{color:#ff6b75}
-.pname{display:none;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;padding:0 4px}
-.prev.isfile img{display:none}
-.prev.isfile .pname{display:block}
-.fl{display:block;width:max-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,0,0,.18);border-radius:10px;padding:6px 10px;margin-bottom:6px;font-size:13.5px}
-.gen{display:block;position:relative;width:min(100%,300px);aspect-ratio:1;border-radius:14px;overflow:hidden;background:rgba(0,0,0,.3);margin-bottom:6px}
-.b .gen img{width:100%;height:100%;max-height:none;object-fit:cover;margin:0;border-radius:0;opacity:0;transition:opacity .3s}
-.gen:not(.ld):not(.err) img{opacity:1}
-.gen.ld::after,.gen.err::after{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:12px;font-size:14px}
-.gen.ld::after{content:attr(data-note);animation:pulse 1.2s infinite}
-.gen.err::after{content:"Image load nahi hui 😅 tap karke kholo"}
-.note{text-align:center;font-size:11.5px;color:var(--mut);padding:0 14px calc(8px + env(safe-area-inset-bottom))}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
-@keyframes pulse{50%{opacity:.35}}
-@keyframes ripple{0%{box-shadow:0 0 0 0 rgba(255,45,61,.6)}100%{box-shadow:0 0 0 16px rgba(255,45,61,0)}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-</style>
-</head>
-<body>
-<div class="app">
-  <header>
-    <button class="hbtn" id="menu" aria-label="Chats kholo"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
-    <div class="story"><div class="ring"></div><div class="av">K</div><i class="dot" title="Online"></i></div>
-    <div class="who"><b>Kayth AI 👻</b><small id="sub">online</small></div>
-    <button class="hbtn" id="newh" aria-label="Nayi chat"><svg class="i" viewBox="0 0 24 24"><path d="M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
-    <button class="hbtn" id="clear" aria-label="Clear chat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
-  </header>
 
-  <main id="chat">
-    <div class="chip"><i></i>Kayth AI was active now</div>
-    <div id="list"></div>
-  </main>
+def env(name, default=""):
+    # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
+    return os.environ.get(name, default).strip().strip("'\"").strip()
 
-  <footer id="foot">
-    <div class="prev" id="prev"><img id="pimg" alt="Chuni hui photo"><span class="pname" id="pname"></span><button id="prem" aria-label="Photo hatao"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <input type="file" id="file" hidden>
-    <div class="pill">
-      <button class="ic" id="gal" aria-label="File attach karo"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-      <input id="msg" type="text" placeholder="Message bhejo..." autocomplete="off" enterkeyhint="send" maxlength="1000">
-      <div class="recbar" id="recbar"><i></i><span id="rt">Sun raha hu...</span></div>
-    </div>
-    <button id="act" aria-label="Hold to record, or send">
-      <svg class="i mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
-      <svg class="i snd" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
-    </button>
-  </footer>
-  <p class="note">AI se galti ho sakti hai. Zaruri baatein khud check kar lena.</p>
-</div>
-<div class="scrim" id="scrim"></div>
-<aside id="side" aria-label="Chats" inert>
-  <div class="sh"><b>Chats</b><button class="hbtn" id="sclose" aria-label="Band karo"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-  <button class="newbtn" id="newc"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
-  <input id="q" class="sq" type="search" placeholder="Chats dhundho..." autocomplete="off">
-  <div id="chats"></div>
-  <div class="sf">
-    <button id="export"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Is chat ko export karo</button>
-    <button id="delall" class="danger"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Saari chats delete karo</button>
-  </div>
-</aside>
-<div id="toast" role="status"></div>
 
-<script>
-const $ = s => document.querySelector(s);
-const chatEl = $('#chat'), list = $('#list'), msg = $('#msg'), foot = $('#foot'), act = $('#act'),
-      sub = $('#sub'), recbar = $('#recbar'), rt = $('#rt'), toastEl = $('#toast');
-const KEY = 'kayth_chat_v1';
-const ICON_SPK = '<svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
-const TICK1 = '<svg class="i" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 7"/></svg>';
-const TICK2 = '<svg class="i" viewBox="0 0 24 24"><path d="M1.5 12.5l5 5L17 7M10 16.5l1 1L22 7"/></svg>';
-const OFFLINE = [
-  'Net ne dhoka de diya bhai 📡 connection check kar aur phir bhej!',
-  'Server tak pahunch hi nahi paya 😭 thodi der baad try kar.',
-  'Arre yaar, beech raste mein message kho gaya 💀 dobara bhej na!'
-];
-const WELCOME = 'Yo! Kayth AI here 👻 Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨';
-const IMG_LINES = ['Ye lo bhai, fresh fresh 🎨', 'Ban gayi! Kaisi lagi? 😎', 'Dipanshu ke AI ka kamaal 🎨🔥'];
-const SLASH_RE = /^\/(img|image|imagine)\b\s*/i;
-const IMG_WORDS = '(images?|imgs?|photos?|pics?|pictures?|tasveer|tasvir|logo|wallpaper|poster)';
-const IMG_VERBS = '(bana|banao|banado|banaye|banaiye|banana|bna|bnao|bnado|bnaye|bnaiye|bnana|bnai|bnayi|banai|banayi|bnadi|banadi|generate|create|draw|make|dikha|dikhao|dikhado)';
-const IMG_RE = new RegExp(IMG_WORDS + '\\b.*\\b' + IMG_VERBS + '\\b|\\b' + IMG_VERBS + '\\b.*\\b' + IMG_WORDS + '\\b', 'i');
-const DEV_RE = /(इमेज|फोटो|फ़ोटो|तस्वीर|पिक्चर|लोगो).*(बना|दिखा)|(बना|दिखा).*(इमेज|फोटो|फ़ोटो|तस्वीर|पिक्चर|लोगो)/;
-const DRAW_RE = /^(draw|paint|sketch|imagine)\b/i;
-const HOWTO_RE = /\b(kaise|how to|how do|explain|samjha|kya hota|kya hai)\b|कैसे/i;
+API_KEY = env("GROQ_API_KEY")
+DEBUG_KEY = env("DEBUG_KEY")   # /debug tabhi khulega jab ye set ho: /debug?k=<DEBUG_KEY>
+client = Groq(api_key=API_KEY) if API_KEY else None
 
-const SKEY = 'kayth_chats_v2';
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const newChatObj = () => ({ id: uid(), title: 'New chat', t: Date.now(), custom: false, msgs: [] });
-const titleFrom = msgs => {
-  const u = msgs.find(m => m.r === 'user'); if (!u) return '';
-  const s = (u.c || '').trim() || (u.f ? '📎 ' + u.f.name : '📷 Photo');
-  return s.length > 32 ? s.slice(0, 32) + '…' : s;
-};
-let store = null;
-try { store = JSON.parse(localStorage.getItem(SKEY)); } catch (e) {}
-if (!store || !Array.isArray(store.chats) || !store.chats.length) {
-  const c = newChatObj();
-  try { c.msgs = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
-  c.title = titleFrom(c.msgs) || 'New chat';
-  store = { active: c.id, chats: [c] };
+# llama-3.1-8b-instant Groq ne 16 Aug 2026 ko band kar diya.
+# Replacement: openai/gpt-oss-20b. Pehla fail ho to agla try hota hai.
+_models = [env("GROQ_MODEL"), "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
+# Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
+VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
+
+SYSTEM_PROMPT = (
+    "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. "
+    "You are NOT ChatGPT or Meta AI. You talk in Hinglish, funny, Gen-Z, max 3 lines. "
+    "If user says 'I am Dipanshu' or 'boss' or 'creator' then say "
+    "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Never say you are made by OpenAI. "
+    "Rules: Reply only as Kayth AI, fully in character. Never add notes, disclaimers, hashtags or comments "
+    "about your own reply or style (no '(Note: ...)'). Max 3 short lines. "
+    "Roasts and jokes must stay playful: never target anyone's family, religion, caste, gender, body or health. "
+    "If the user asks something serious (health, legal, money, safety), answer carefully and helpfully in the same "
+    "Hinglish tone, without jokes."
+)
+
+ROAST_PROMPT = (
+    "The user has enabled Roast Mode. Keep it playful and witty, focused only on harmless topics. "
+    "Never insult protected traits, family, body, health, religion, caste, or gender. Keep it brief and friendly."
+)
+
+STUDY_PROMPT = (
+    "The user has enabled Study Mode. Teach clearly in simple Hinglish, break explanations into small steps, "
+    "use a short example when useful, and ask a quick check-for-understanding question when appropriate."
+)
+
+SHAYAR_PROMPT = (
+    "The user has enabled Shayar Mode. Reply as a skilled Hindi/Urdu shayar. "
+    "Write original, emotionally resonant shayari that fits the user's topic and requested mood. "
+    "Use natural Hindi/Hinglish or Urdu vocabulary, usually 2 to 4 concise lines with tasteful line breaks. "
+    "Do not force rhyme, do not claim existing poets’ work as your own, and avoid explanations unless asked. "
+    "If the user asks a serious factual or safety question, answer helpfully and accurately instead of turning it into poetry."
+)
+
+BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
+BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
+
+FALLBACKS = [
+    "Bhai mera dimaag thoda hang ho gaya 😵 ek baar phir bhej na!",
+    "Server ne chai break le liya ☕ 5 sec baad try kar!",
+    "Oops, signal gaya tel lene 📡 dobara bol, is baar pakka sunuga.",
+    "Brain.exe has stopped working 💀 thodi der baad aa, main reboot ho raha hu.",
+]
+NO_KEY_REPLY = "Boss ne meri API key lagayi hi nahi 😂 admin se bolo GROQ_API_KEY set kare!"
+RATE_LIMIT_REPLY = "Bohot log mujhse baat kar rahe hain 😭 thoda ruk ke bhej, abhi line lambi hai!"
+BAD_IMAGE_REPLY = "Ye photo thodi badi ya galat lag rahi hai 😅 chhoti photo bhej!"
+
+
+def clean_history(history):
+    out = []
+    if not isinstance(history, list):
+        return out
+    for m in history[-6:]:
+        if (
+            isinstance(m, dict)
+            and m.get("role") in ("user", "assistant")
+            and isinstance(m.get("content"), str)
+            and m["content"].strip()
+        ):
+            out.append({"role": m["role"], "content": m["content"][:1000]})
+    return out
+
+
+def clean_output(text):
+    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
+    # model kabhi kabhi aakhir me "(Note: ...)" jod deta hai, use hata do
+    text = re.sub(r"\s*\((?:note|nb|p\.s\.?)[^)]*\)\s*$", "", text.strip(), flags=re.IGNORECASE)
+    return text.strip()
+
+
+def complete(models, messages, max_tokens=800, timeout=25):
+    """Models ko ek ek karke try karta hai, pehla jo chale uska reply deta hai."""
+    last = None
+    for model in models:
+        try:
+            kwargs = dict(model=model, messages=messages, max_tokens=max_tokens, temperature=0.8, timeout=timeout)
+            if model.startswith("openai/gpt-oss"):
+                kwargs["extra_body"] = {"reasoning_effort": "low"}
+            resp = client.chat.completions.create(**kwargs)
+            text = clean_output(resp.choices[0].message.content)
+            if text:
+                return text
+            last = ValueError("empty reply from " + model)
+        except Exception as e:
+            app.logger.warning("Model %s failed: %s: %s", model, type(e).__name__, e)
+            last = e
+    raise last or RuntimeError("no model configured")
+
+
+# ----- Per-IP limits: ek banda poora Groq quota na kha jaye -----
+# (per minute, per day). Render ke env se badal sakte ho, jaise LIMIT_CHAT_PER_DAY=40
+LIMITS = {
+    "chat": (int(env("LIMIT_CHAT_PER_MIN", "5")), int(env("LIMIT_CHAT_PER_DAY", "30"))),
+    "photo": (int(env("LIMIT_PHOTO_PER_MIN", "1")), int(env("LIMIT_PHOTO_PER_DAY", "3"))),
+    "image": (int(env("LIMIT_IMAGE_PER_MIN", "3")), int(env("LIMIT_IMAGE_PER_DAY", "10"))),
 }
-const cur = () => store.chats.find(c => c.id === store.active) || store.chats[0];
-store.active = cur().id;
-let chat = cur().msgs, busy = false, pendingImg = null, pendingFile = null, quiet = false;
-const persist = () => { try { localStorage.setItem(SKEY, JSON.stringify({ active: store.active, chats: store.chats.map(c => ({ ...c, msgs: c.msgs.slice(-200).map(({ img, ...m }) => m) })) })); } catch (e) {} };
-const save = () => { const c = cur(); if (c.msgs.some(m => m.r === 'user')) { c.t = Date.now(); if (!c.custom) c.title = titleFrom(c.msgs); } persist(); };
-const clock = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-const pick = a => a[Math.floor(Math.random() * a.length)];
-const toBottom = () => chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' });
-
-let toastT;
-function toast(t) { toastEl.textContent = t; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2400); }
-
-/* ---------- render ---------- */
-function setTicks(el, s) { el.className = 'tk ' + s; el.innerHTML = s === 'sent' ? TICK1 : TICK2; }
-
-function add(m, state) {
-  const ai = m.r === 'assistant';
-  const row = document.createElement('div');
-  row.className = 'row ' + (ai ? 'ai' : 'user');
-  const b = document.createElement('div'); b.className = 'b';
-  const t = document.createElement('div'); t.className = 't'; t.textContent = m.c;
-  const meta = document.createElement('div'); meta.className = 'meta';
-  if (m.p) {
-    if (m.img) { const im = document.createElement('img'); im.src = m.img; im.alt = 'Photo'; b.append(im); }
-    else if (!m.c) t.textContent = '📷 Photo';
-  }
-  if (m.gen) {
-    const w = document.createElement('a'); w.className = 'gen ld'; w.href = m.gen.url; w.target = '_blank'; w.rel = 'noopener';
-    const im = document.createElement('img'); im.alt = m.gen.prompt || 'Generated image'; w.append(im); b.append(w);
-    let tries = 0;
-    const load = () => { w.classList.add('ld'); im.src = m.gen.url + (tries ? '&r=' + tries : ''); };
-    w.dataset.note = 'Drawing... 🎨';
-    im.onload = () => w.classList.remove('ld', 'err');
-    im.onerror = () => {
-      if (tries < 3) { tries++; w.dataset.note = 'Line lambi hai, 15 sec mein retry... ⏳'; setTimeout(load, 16000); }
-      else { w.classList.remove('ld'); w.classList.add('err'); }
-    };
-    load();
-  }
-  if (m.f) { const fl = document.createElement('div'); fl.className = 'fl'; fl.textContent = '📎 ' + m.f.name; b.append(fl); }
-  b.append(t, meta);
-  let tk = null;
-  if (ai) {
-    const s = document.createElement('button');
-    s.className = 'spk'; s.innerHTML = ICON_SPK; s.setAttribute('aria-label', 'Reply sunao');
-    s.onclick = () => speak(m.c, s);
-    const time = document.createElement('span'); time.textContent = clock(m.t);
-    meta.append(s, time);
-  } else {
-    const time = document.createElement('span'); time.textContent = clock(m.t);
-    tk = document.createElement('span'); setTicks(tk, state || 'seen');
-    meta.append(time, tk);
-  }
-  row.append(b); list.append(row); if (!quiet) toBottom();
-  return tk;
+LIMIT_MSG = {
+    "chat": ("Thoda dheere bhai 😅 1 minute mein itne messages nahi chalte, thodi der ruk ke bhej.",
+             "Aaj ke free messages khatam 😅 kal phir aa, tab tak naye messages ke liye refresh mat kar!"),
+    "photo": ("Photo thodi der baad bhejna 📸 abhi pichli wali ka kaam chal raha hai.",
+              "Aaj ke free photo-checks khatam 📸 kal phir bhej!"),
+    "image": ("Itni jaldi nahi bhai 🎨 thodi der baad phir bol.",
+              "Aaj ki free images khatam 🎨 kal phir bana dunga!"),
 }
+_hits = defaultdict(deque)
+_lock = threading.Lock()
 
-function showTyping(on, label) {
-  let el = $('#typing');
-  document.body.classList.toggle('busy', on);
-  sub.textContent = on ? (label ? 'drawing...' : 'typing...') : 'online'; sub.classList.toggle('on', on);
-  if (on && !el) {
-    el = document.createElement('div'); el.id = 'typing'; el.className = 'row ai typing';
-    el.innerHTML = '<div class="b"><div class="dots"><i></i><i></i><i></i></div>' + (label || 'Kayth AI is typing') + '...</div>';
-    list.append(el); toBottom();
-  } else if (!on && el) el.remove();
-}
 
-/* ---------- send ---------- */
-async function send(text) {
-  text = (text || '').trim();
-  if (SLASH_RE.test(text) && !text.replace(SLASH_RE, '').trim()) return toast('Kya banau? /image ke baad likho 🎨');
-  const image = pendingImg, att = pendingFile;
-  if ((!text && !image && !att) || busy) return;
-  busy = true; msg.value = ''; clearImg(); stopSpeak();
-  const history = chat.slice(-10).map(m => ({ role: m.r, content: ((m.c || '') + (m.p ? ' [photo bheji]' : '') + (m.f ? ' [file bheji: ' + m.f.name + ']' : '') + (m.gen ? ' [image bani: ' + m.gen.prompt + ']' : '')).trim() })).filter(m => m.content);
-  const um = { r: 'user', c: text, t: Date.now(), p: !!image, img: image, f: att ? { name: att.name, size: att.size } : undefined };
-  chat.push(um); const tk = add(um, 'sent'); save();
-  setTimeout(() => setTicks(tk, 'delivered'), 350);
-  const imgReq = !image && !att && (SLASH_RE.test(text) || ((IMG_RE.test(text) || DEV_RE.test(text) || DRAW_RE.test(text)) && !HOWTO_RE.test(text)));
-  showTyping(true, imgReq ? 'Kayth AI is drawing' : '');
-  const seenT = setTimeout(() => setTicks(tk, 'seen'), 900);
+def client_ip():
+    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?"
 
-  let reply = '', gen = null;
-  try {
-    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att }) });
-    const d = await res.json(); reply = d.reply || ''; if (d.url) gen = { url: d.url, prompt: d.prompt || '' };
-    if (d.err) console.warn('Kayth AI error:', d.err);
-  } catch (e) {}
-  clearTimeout(seenT); setTicks(tk, 'seen');
-  if (gen && !reply) reply = pick(IMG_LINES);
-  if (!reply) reply = pick(OFFLINE);
-  showTyping(false);
-  const am = { r: 'assistant', c: reply, t: Date.now(), gen };
-  chat.push(am); add(am); save(); busy = false;
-}
 
-msg.addEventListener('input', sync);
-msg.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send(msg.value); } });
-function sync() { foot.classList.toggle('has', !!msg.value.trim() || !!pendingImg || !!pendingFile); }
+def hit(kind):
+    """(ok, message, token). Limit ke andar ho to 1 gin leta hai."""
+    key, now = (client_ip(), kind), time.time()
+    per_min, per_day = LIMITS[kind]
+    with _lock:
+        q = _hits[key]
+        while q and now - q[0] > 86400:
+            q.popleft()
+        if len(q) >= per_day:
+            return False, LIMIT_MSG[kind][1], None
+        if sum(1 for t in q if now - t < 60) >= per_min:
+            return False, LIMIT_MSG[kind][0], None
+        q.append(now)
+        if len(_hits) > 5000:   # purane IPs saaf karo
+            for k in [k for k, d in _hits.items() if not d or now - d[-1] > 86400]:
+                del _hits[k]
+        return True, None, (key, now)
 
-/* ---------- text to speech ---------- */
-function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
-function speak(text, btn) {
-  if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
-  if (btn.classList.contains('on')) return stopSpeak();
-  stopSpeak();
-  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
-  u.lang = 'hi-IN';
-  const v = speechSynthesis.getVoices().find(x => x.lang === 'hi-IN') || speechSynthesis.getVoices().find(x => x.lang === 'en-IN');
-  if (v) u.voice = v;
-  u.onend = u.onerror = () => btn.classList.remove('on');
-  btn.classList.add('on'); speechSynthesis.speak(u);
-}
-if ('speechSynthesis' in window) speechSynthesis.getVoices();
 
-/* ---------- voice (hold to record) ---------- */
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let sess = null, startX = 0;
+def give_back(token):
+    """Groq fail hua to gin wapas kar do."""
+    if not token:
+        return
+    key, ts = token
+    with _lock:
+        q = _hits.get(key)
+        if q and ts in q:
+            q.remove(ts)
 
-function setRec(on) { act.classList.toggle('rec', on); recbar.classList.toggle('show', on); recbar.classList.remove('cancel'); if (on) rt.textContent = 'Sun raha hu... bolo'; }
 
-function startRec(x) {
-  if (busy) return;
-  if (!SR) return toast('Voice ke liye Chrome ya Edge use karo');
-  stopSpeak();
-  const r = new SR();
-  const s = sess = { r, text: '', cancelled: false, t0: Date.now(), live: true };
-  r.lang = 'hi-IN'; r.continuous = true; r.interimResults = true;
-  r.onresult = e => {
-    let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-    s.text = t; if (!s.cancelled) rt.textContent = t || 'Sun raha hu... bolo';
-  };
-  r.onerror = e => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Mic permission allow karo');
-    else if (e.error === 'network') toast('Voice ke liye internet chahiye');
-    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Voice error: ' + e.error);
-    s.cancelled = true;
-  };
-  r.onend = () => {
-    if (s.live) { s.live = false; setRec(false); }
-    const t = s.text.trim();
-    if (s.cancelled) return;
-    if (t) send(t); else toast('Kuch suna nahi, phir se bol 🎙️');
-  };
-  startX = x;
-  try { r.start(); setRec(true); } catch (e) { toast('Mic start nahi hua, dobara try kar'); }
-}
+def file_note(f):
+    name = str(f.get("name", ""))[:80]
+    text = f.get("text") if isinstance(f.get("text"), str) else ""
+    if text.strip():
+        return "\n\n[User ne file bheji: %s]\n```\n%s\n```" % (name, text[:6000])
+    return (
+        "\n\n[User ne file '%s' (%s) bheji hai, par uska content padh nahi sakte. "
+        "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
+    )
 
-function stopRec() {
-  const s = sess; if (!s || !s.live) return;
-  s.live = false; setRec(false);
-  if (Date.now() - s.t0 < 450) { s.cancelled = true; toast('Mic ko hold karke bolo 🎙️'); }
-  try { s.cancelled ? s.r.abort() : s.r.stop(); } catch (e) {}
-}
 
-act.addEventListener('pointerdown', e => {
-  if (msg.value.trim() || pendingImg || pendingFile) return;
-  e.preventDefault(); act.setPointerCapture(e.pointerId); startRec(e.clientX);
-});
-act.addEventListener('pointermove', e => {
-  const s = sess; if (!s || !s.live) return;
-  s.cancelled = startX - e.clientX > 90;
-  recbar.classList.toggle('cancel', s.cancelled);
-  if (s.cancelled) rt.textContent = 'Chhodo to cancel ho jayega';
-  else rt.textContent = s.text || 'Sun raha hu... bolo';
-});
-act.addEventListener('pointerup', stopRec);
-act.addEventListener('pointercancel', stopRec);
-act.addEventListener('contextmenu', e => e.preventDefault());
-act.addEventListener('click', () => { if (msg.value.trim() || pendingImg || pendingFile) send(msg.value); });
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-/* ---------- misc ---------- */
-const fileIn = $('#file'), prev = $('#prev'), pimg = $('#pimg'), pname = $('#pname');
-const MAX_FILE = 10 * 1024 * 1024;
-const isTextFile = f => f.type.startsWith('text/') || ['application/json', 'application/xml', 'application/javascript'].includes(f.type) ||
-  /\.(txt|md|csv|tsv|json|xml|html?|css|jsx?|tsx?|py|java|c|cpp|h|cs|go|rs|rb|php|sql|sh|ya?ml|toml|ini|log|tex)$/i.test(f.name);
-const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-function clearImg() { pendingImg = null; pendingFile = null; prev.classList.remove('show', 'isfile'); fileIn.value = ''; sync(); }
-$('#prem').addEventListener('click', clearImg);
-$('#gal').addEventListener('click', () => fileIn.click());
 
-let pdfLib = null;
-function loadPdf() {
-  return pdfLib || (pdfLib = new Promise((ok, no) => {
-    const v = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-    const sc = document.createElement('script'); sc.src = v + 'pdf.min.js';
-    sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = v + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
-    sc.onerror = () => { pdfLib = null; no(new Error('pdf.js load fail')); };
-    document.head.append(sc);
-  }));
-}
-async function pdfText(f) {
-  const lib = await loadPdf();
-  const pdf = await lib.getDocument({ data: await f.arrayBuffer() }).promise;
-  let out = '';
-  for (let i = 1; i <= Math.min(pdf.numPages, 30) && out.length < 14000; i++) {
-    const tc = await (await pdf.getPage(i)).getTextContent();
-    out += tc.items.map(x => x.str).join(' ') + '\n';
-  }
-  return out;
-}
+IMAGE_SYSTEM = (
+    "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
+    "(subject, style, lighting, mood). Output ONLY the prompt, no quotes, no extra words. "
+    "If the request is sexual, gory/violent, or depicts a real named person, output exactly: REFUSE"
+)
+IMAGE_REFUSE = [
+    "Ye wali image main nahi bana sakta bhai 🙅 kuch aur try kar!",
+    "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
+]
 
-fileIn.addEventListener('change', async () => {
-  const f = fileIn.files[0]; if (!f) return;
-  if (f.size > MAX_FILE) { fileIn.value = ''; return toast('File 10 MB se chhoti honi chahiye'); }
-  if (f.type.startsWith('image/')) {
-    const img = new Image(), url = URL.createObjectURL(f);
-    img.onload = () => {
-      const sc = Math.min(1, 1024 / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      pendingFile = null; pendingImg = c.toDataURL('image/jpeg', 0.8); URL.revokeObjectURL(url);
-      pimg.src = pendingImg; prev.classList.remove('isfile'); prev.classList.add('show'); sync(); msg.focus();
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); toast('Ye photo khul nahi payi 😅'); };
-    img.src = url; return;
-  }
-  let text = '';
-  try {
-    if (isTextFile(f)) text = await f.text();
-    else if (isPdf(f)) { toast('PDF padh raha hu...'); text = await pdfText(f); }
-  } catch (e) {}
-  text = text.trim().slice(0, 6000);
-  pendingImg = null;
-  pendingFile = { name: f.name.slice(0, 80), type: f.type || 'unknown', size: f.size, text };
-  pname.textContent = '📎 ' + f.name; prev.classList.add('show', 'isfile'); sync(); msg.focus();
-  if (!text) toast('Is file ka content padh nahi paunga, sirf naam jayega');
-});
-const ICON_EDIT = '<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/></svg>';
-const ICON_DEL = '<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
-const side = $('#side'), scrim = $('#scrim'), qEl = $('#q'), box = $('#chats');
-const guardBusy = () => { if (busy) { toast('Pehle reply aane do, phir chat badlo ⏳'); return true; } return false; };
-const snip = c => {
-  if (!c.msgs.some(m => m.r === 'user')) return 'Abhi kuch nahi bheja';
-  const m = [...c.msgs].reverse().find(x => x.c); if (!m) { const l = [...c.msgs].reverse().find(x => x.f); return l ? '📎 ' + l.f.name : '📷 Photo'; }
-  return m.c.length > 38 ? m.c.slice(0, 38) + '…' : m.c;
-};
 
-function openSide() { renderSide(); side.inert = false; side.classList.add('open'); scrim.classList.add('show'); }
-function closeSide() { side.classList.remove('open'); scrim.classList.remove('show'); side.inert = true; }
+@app.route("/image", methods=["POST"])
+def image():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message")
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
+    message = message.strip()[:500]
 
-function renderChat() {
-  stopSpeak(); list.innerHTML = ''; quiet = true;
-  chat.forEach(m => add(m)); quiet = false;
-  if (!chat.length) welcome();
-  chatEl.scrollTo({ top: chatEl.scrollHeight });
-}
+    ok, msg, token = hit("image")
+    if not ok:
+        return jsonify({"reply": msg, "limit": True})
 
-function renderSide() {
-  const q = qEl.value.trim().toLowerCase();
-  const items = [...store.chats].sort((a, b) => b.t - a.t)
-    .filter(c => !q || c.title.toLowerCase().includes(q) || c.msgs.some(m => (m.c || '').toLowerCase().includes(q)));
-  box.innerHTML = '';
-  if (!items.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Koi chat nahi mili'; box.append(p); return; }
-  items.forEach(c => {
-    const el = document.createElement('div'); el.className = 'ci' + (c.id === store.active ? ' on' : '');
-    const o = document.createElement('button'); o.className = 'co';
-    const b = document.createElement('b'); b.textContent = c.title;
-    const s = document.createElement('small'); s.textContent = snip(c);
-    o.append(b, s); o.onclick = () => openChat(c.id);
-    const r = document.createElement('button'); r.className = 'ca'; r.innerHTML = ICON_EDIT; r.setAttribute('aria-label', 'Naam badlo'); r.onclick = () => renameChat(c.id);
-    const d = document.createElement('button'); d.className = 'ca del'; d.innerHTML = ICON_DEL; d.setAttribute('aria-label', 'Chat delete karo'); d.onclick = () => delChat(c.id);
-    el.append(o, r, d); box.append(el);
-  });
-}
+    prompt = message
+    if client is not None:
+        try:
+            prompt = complete(
+                TEXT_MODELS,
+                [{"role": "system", "content": IMAGE_SYSTEM}, {"role": "user", "content": message}],
+                400,
+                10,
+            )
+        except Exception:
+            app.logger.exception("Image prompt rewrite failed")
 
-function openChat(id) {
-  if (id === store.active) return closeSide();
-  if (guardBusy()) return;
-  store.active = id; chat = cur().msgs; clearImg(); renderChat(); persist(); renderSide(); closeSide();
-}
+    prompt = " ".join(prompt.split()).strip("\"'")[:300]
+    if not prompt or prompt.upper().startswith("REFUSE"):
+        give_back(token)
+        return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
 
-function newChat() {
-  if (guardBusy()) return;
-  if (!chat.some(m => m.r === 'user')) { closeSide(); toast('Ye already naya chat hai ✨'); msg.focus(); return; }
-  const c = newChatObj(); store.chats.push(c); store.active = c.id; chat = c.msgs;
-  clearImg(); renderChat(); persist(); renderSide(); closeSide(); msg.focus();
-}
+    # Pollinations ka free endpoint: browser seedha image load karta hai
+    url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
+        quote(prompt, safe=""),
+        random.randint(1, 999999),
+    )
+    return jsonify({"url": url, "prompt": prompt})
 
-function renameChat(id) {
-  const c = store.chats.find(x => x.id === id); if (!c) return;
-  const n = prompt('Chat ka naya naam (khali chhodo to auto naam):', c.title); if (n === null) return;
-  const v = n.trim().slice(0, 40);
-  if (v) { c.title = v; c.custom = true; } else { c.custom = false; c.title = titleFrom(c.msgs) || 'New chat'; }
-  persist(); renderSide();
-}
 
-function delChat(id) {
-  const c = store.chats.find(x => x.id === id); if (!c) return;
-  if (id === store.active && guardBusy()) return;
-  if (!confirm('"' + c.title + '" delete kar du?')) return;
-  store.chats = store.chats.filter(x => x.id !== id);
-  if (!store.chats.length) store.chats.push(newChatObj());
-  if (id === store.active) {
-    store.active = [...store.chats].sort((a, b) => b.t - a.t)[0].id; chat = cur().msgs; clearImg(); renderChat();
-  }
-  persist(); renderSide();
-}
+@app.route("/health")
+def health():
+    return "ok", 200
 
-$('#menu').addEventListener('click', openSide);
-$('#sclose').addEventListener('click', closeSide);
-scrim.addEventListener('click', closeSide);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSide(); });
-$('#newh').addEventListener('click', newChat);
-$('#newc').addEventListener('click', newChat);
-qEl.addEventListener('input', renderSide);
 
-$('#clear').addEventListener('click', () => {
-  if (guardBusy() || !confirm('Is chat ke saare messages clear kar du?')) return;
-  const c = cur(); c.msgs = chat = []; c.custom = false; c.title = 'New chat';
-  clearImg(); renderChat(); persist(); renderSide();
-});
+@app.route("/debug")
+def debug():
+    """Browser me kholo: kayth-ai-2.onrender.com/debug. Kaam hone ke baad hata dena."""
+    if not DEBUG_KEY:
+        return "DEBUG_KEY Render me set nahi hai (ya deploy abhi nahi hua).", 404
+    if request.args.get("k") != DEBUG_KEY:
+        return "Key galat hai. Link me ?k= ke baad wahi shabd likho jo DEBUG_KEY ki Value me hai.", 404
+    lines = [
+        "GROQ_API_KEY set: %s" % bool(API_KEY),
+        "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
+        "Key length: %d" % len(API_KEY),
+        "Text models: %s" % ", ".join(TEXT_MODELS),
+        "Vision models: %s" % ", ".join(VISION_MODELS),
+        "",
+    ]
+    if client is None:
+        lines.append("Client nahi bana: GROQ_API_KEY Render me set karo.")
+        return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    def probe(model):
+        try:
+            t = complete([model], [{"role": "user", "content": "Say hi in 3 words"}], 1000, 20)
+            return "OK   %s -> %s" % (model, t[:60])
+        except Exception as e:
+            return "FAIL %s -> %s: %s" % (model, type(e).__name__, str(e)[:200])
 
-$('#delall').addEventListener('click', () => {
-  if (guardBusy() || !confirm('Saari chats delete kar du? Ye wapas nahi aayengi.')) return;
-  const c = newChatObj(); store = { active: c.id, chats: [c] }; chat = c.msgs;
-  clearImg(); renderChat(); persist(); renderSide(); closeSide();
-});
+    def probe_image():
+        try:
+            req = urllib.request.Request("https://image.pollinations.ai/prompt/cat?width=64&height=64&nologo=true&seed=1",
+                                         headers={"User-Agent": "Mozilla/5.0"})
+            r = urllib.request.urlopen(req, timeout=20)
+            return "OK   pollinations -> HTTP %s, %s, %d bytes" % (r.status, r.headers.get("Content-Type"), len(r.read(200000)))
+        except urllib.error.HTTPError as e:
+            return "FAIL pollinations -> HTTP %s" % e.code
+        except Exception as e:
+            return "FAIL pollinations -> %s: %s" % (type(e).__name__, str(e)[:150])
 
-$('#export').addEventListener('click', () => {
-  if (!chat.length) return toast('Export karne ko kuch nahi hai');
-  const text = chat.map(m => '[' + clock(m.t) + '] ' + (m.r === 'user' ? 'Tum' : 'Kayth AI') + ': ' + (m.c || (m.f ? '📎 ' + m.f.name : '📷 Photo'))).join('\n\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-  a.download = (cur().title.replace(/[^\w\- ]+/g, '').trim().slice(0, 30) || 'kayth-chat') + '.txt';
-  a.click(); URL.revokeObjectURL(a.href);
-});
+    models = TEXT_MODELS + VISION_MODELS
+    with ThreadPoolExecutor(max_workers=len(models) + 1) as ex:
+        futs = [ex.submit(probe, m) for m in models] + [ex.submit(probe_image)]
+        lines.extend(f.result() for f in futs)
+    return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
-function welcome() { const m = { r: 'assistant', c: WELCOME, t: Date.now() }; chat.push(m); add(m); save(); }
 
-renderChat(); renderSide();
-setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
-</script>
-<!-- Cloudflare Web Analytics -->
-<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "5d85b447ce344583b5fba4281b697c37"}'></script>
-<!-- End Cloudflare Web Analytics -->
-</body>
-</html>
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message")
+    image = data.get("image")
+    file = data.get("file") if isinstance(data.get("file"), dict) else None
+    message = message.strip()[:1000] if isinstance(message, str) else ""
+
+    if image is not None:
+        if not (isinstance(image, str) and image.startswith("data:image/") and len(image) < 6_000_000):
+            return jsonify({"reply": BAD_IMAGE_REPLY}), 400
+        if not message:
+            message = "Is photo mein kya hai? Batao."
+    elif not message and not file:
+        return jsonify({"reply": "Kuch likh to sahi bhai 😅"}), 400
+    if file and not message:
+        message = "Is file mein kya hai? Short mein batao."
+
+    if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
+        return jsonify({"reply": BOSS_REPLY})
+
+    if client is None:
+        return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
+
+    ok, msg, token = hit("photo" if image else "chat")
+    if not ok:
+        return jsonify({"reply": msg, "limit": True})
+
+    if image:
+        user_msg = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": message},
+                {"type": "image_url", "image_url": {"url": image}},
+            ],
+        }
+        models = VISION_MODELS
+    else:
+        user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
+        models = TEXT_MODELS
+
+    mode = data.get("mode")
+    mode_prompts = {"roast": ROAST_PROMPT, "study": STUDY_PROMPT, "shayar": SHAYAR_PROMPT}
+    selected_prompt = mode_prompts.get(mode) if not image else None
+    system_prompt = SYSTEM_PROMPT + ("\n\n" + selected_prompt if selected_prompt else "")
+    messages = [{"role": "system", "content": system_prompt}] + clean_history(data.get("history")) + [user_msg]
+
+    try:
+        return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
+    except RateLimitError:
+        give_back(token)
+        return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
+    except Exception as e:
+        app.logger.exception("Groq call failed")
+        give_back(token)
+        return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
