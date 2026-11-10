@@ -12,11 +12,14 @@ from urllib.parse import quote
 from flask import Flask, render_template, request, jsonify
 from groq import Groq, RateLimitError
 
+
 app = Flask(__name__)
+
 
 def env(name, default=""):
     # Render me paste karte time space ya quotes aa jaate hain, unhe hata do
     return os.environ.get(name, default).strip().strip("'\"").strip()
+
 
 API_KEY = env("GROQ_API_KEY")
 DEBUG_KEY = env("DEBUG_KEY")   # /debug tabhi khulega jab ye set ho: /debug?k=<DEBUG_KEY>
@@ -29,93 +32,17 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 # Photo samajhne wala model (Groq pe Preview tier). Env se badal sakte ho.
 VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
 
-# ----- Kayth AI ke 4 modes: normal, roast, study, shayari -----
-# BASE_PROMPT har mode me common rehta hai (identity + safety rules).
-# Har mode ka apna "style" hai, jo BASE_PROMPT ke baad jud jaata hai.
-BASE_PROMPT = (
+SYSTEM_PROMPT = (
     "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. "
-    "You are NOT ChatGPT or Meta AI. Never say you are made by OpenAI. "
+    "You are NOT ChatGPT or Meta AI. You talk in Hinglish, funny, Gen-Z, max 3 lines. "
     "If user says 'I am Dipanshu' or 'boss' or 'creator' then say "
-    "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. "
+    "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Never say you are made by OpenAI. "
     "Rules: Reply only as Kayth AI, fully in character. Never add notes, disclaimers, hashtags or comments "
-    "about your own reply or style (no '(Note: ...)'). "
+    "about your own reply or style (no '(Note: ...)'). Max 3 short lines. "
     "Roasts and jokes must stay playful: never target anyone's family, religion, caste, gender, body or health. "
     "If the user asks something serious (health, legal, money, safety), answer carefully and helpfully in the same "
-    "Hinglish tone, without jokes or roasts. "
+    "Hinglish tone, without jokes."
 )
-
-# Roast mode ke 2 variants: hinglish ya haryanvi (user frontend se chunta hai)
-ROAST_VARIANTS = {
-    "hinglish": (
-        "MODE: Roast. Talk in casual Hinglish (Hindi + English mix, simple Hindi words, no regional dialect) like a "
-        "best friend teasing them. Playfully roast the user's message with witty, savage-but-friendly one-liners. "
-        "Roast only what they said or did (their question, plan, excuse), never who they are. After the roast, "
-        "still give the actual useful answer. Use a few emojis. Max 3 short lines."
-    ),
-    "haryanvi": (
-        "MODE: Roast. Talk in Hinglish with a strong Haryanvi accent and Haryanvi words, like a desi Haryanvi "
-        "friend from a village teasing them (use words like: re, ke, se/sai instead of hai, ghani, tau, ladle, "
-        "baawla, thara/mhara, ke ho rya se, ke kar rya se, ram ram). Playfully roast the user's message with "
-        "witty, savage-but-friendly one-liners. Roast only what they said or did (their question, plan, excuse), "
-        "never who they are, and never make fun of Haryana or Haryanvi people. After the roast, still give the "
-        "actual useful answer. Use a few emojis. Max 3 short lines."
-    ),
-}
-DEFAULT_ROAST = "haryanvi"
-
-MODES = {
-    "normal": {
-        "style": (
-            "MODE: Normal. Talk in friendly, clear Hinglish. Light humour is fine, but keep it calm and helpful. "
-            "Give direct, accurate answers. Max 3 short lines unless the user asks for detail."
-        ),
-        "max_tokens": 600,
-    },
-    "roast": {
-        "style": ROAST_VARIANTS[DEFAULT_ROAST],
-        "max_tokens": 600,
-    },
-    "study": {
-        "style": (
-            "MODE: Study. You are a patient, friendly tutor who talks in simple Hinglish. Explain step by step with "
-            "easy words and one small example. Use short numbered points when it helps. Give accurate facts only. "
-            "End with one small question to check understanding. Keep it under 8 short lines. "
-            "No jokes unless they help remember something."
-        ),
-        "max_tokens": 1000,
-    },
-    "shayari": {
-        "style": (
-            "MODE: Shayari. Talk in beautiful Hinglish shayari like a desi poet friend. "
-            "RULES: 1. Har jawab ki shuruaat 4 line ki shayari se karo, jo user ke sawaal ka jawab de. "
-            "2. Shayari ke baad 'Matlab:' likh kar 1-2 line me simple me samjha do. "
-            "3. Style: dil se, thoda pyaar, thoda attitude, thoda dard. "
-            "4. Chahe sawaal padhai, coding, ya funny ho, jawab hamesha shayari me hi hoga. "
-            "5. Shayari me kabhi family, religion, caste, gender, body ya health ka mazaak mat banao. "
-            "6. Agar sawaal serious ho (health, paisa, safety) to shayari chhoti rakho aur sahi jankari zaroor do."
-        ),
-        "max_tokens": 800,
-    },
-}
-DEFAULT_MODE = "normal"
-
-def get_mode(value):
-    """Frontend se aaya mode check karo; galat ho to normal."""
-    if isinstance(value, str):
-        value = value.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
-        if value in MODES:
-            return value
-    return DEFAULT_MODE
-
-def get_roast_style(value):
-    """Roast ka variant: hinglish ya haryanvi; galat ho to default."""
-    if isinstance(value, str) and value.strip().lower() in ROAST_VARIANTS:
-        return value.strip().lower()
-    return DEFAULT_ROAST
-
-def build_system_prompt(mode, roast_style=DEFAULT_ROAST):
-    style = ROAST_VARIANTS[roast_style] if mode == "roast" else MODES[mode]["style"]
-    return BASE_PROMPT + style
 
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
@@ -129,6 +56,7 @@ FALLBACKS = [
 NO_KEY_REPLY = "Boss ne meri API key lagayi hi nahi 😂 admin se bolo GROQ_API_KEY set kare!"
 RATE_LIMIT_REPLY = "Bohot log mujhse baat kar rahe hain 😭 thoda ruk ke bhej, abhi line lambi hai!"
 BAD_IMAGE_REPLY = "Ye photo thodi badi ya galat lag rahi hai 😅 chhoti photo bhej!"
+
 
 def clean_history(history):
     out = []
@@ -144,11 +72,13 @@ def clean_history(history):
             out.append({"role": m["role"], "content": m["content"][:1000]})
     return out
 
+
 def clean_output(text):
-    text = re.sub(r"", "", text or "", flags=re.DOTALL)
+    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
     # model kabhi kabhi aakhir me "(Note: ...)" jod deta hai, use hata do
     text = re.sub(r"\s*\((?:note|nb|p\.s\.?)[^)]*\)\s*$", "", text.strip(), flags=re.IGNORECASE)
     return text.strip()
+
 
 def complete(models, messages, max_tokens=800, timeout=25):
     """Models ko ek ek karke try karta hai, pehla jo chale uska reply deta hai."""
@@ -168,7 +98,9 @@ def complete(models, messages, max_tokens=800, timeout=25):
             last = e
     raise last or RuntimeError("no model configured")
 
+
 # ----- Per-IP limits: ek banda poora Groq quota na kha jaye -----
+# (per minute, per day). Render ke env se badal sakte ho, jaise LIMIT_CHAT_PER_DAY=40
 LIMITS = {
     "chat": (int(env("LIMIT_CHAT_PER_MIN", "5")), int(env("LIMIT_CHAT_PER_DAY", "30"))),
     "photo": (int(env("LIMIT_PHOTO_PER_MIN", "1")), int(env("LIMIT_PHOTO_PER_DAY", "3"))),
@@ -185,8 +117,10 @@ LIMIT_MSG = {
 _hits = defaultdict(deque)
 _lock = threading.Lock()
 
+
 def client_ip():
     return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?"
+
 
 def hit(kind):
     """(ok, message, token). Limit ke andar ho to 1 gin leta hai."""
@@ -201,10 +135,11 @@ def hit(kind):
         if sum(1 for t in q if now - t < 60) >= per_min:
             return False, LIMIT_MSG[kind][0], None
         q.append(now)
-        if len(_hits) > 5000:
+        if len(_hits) > 5000:   # purane IPs saaf karo
             for k in [k for k, d in _hits.items() if not d or now - d[-1] > 86400]:
                 del _hits[k]
         return True, None, (key, now)
+
 
 def give_back(token):
     """Groq fail hua to gin wapas kar do."""
@@ -216,6 +151,7 @@ def give_back(token):
         if q and ts in q:
             q.remove(ts)
 
+
 def file_note(f):
     name = str(f.get("name", ""))[:80]
     text = f.get("text") if isinstance(f.get("text"), str) else ""
@@ -226,9 +162,11 @@ def file_note(f):
         "User ko honestly batao ki file khol nahi paye.]" % (name, str(f.get("type", ""))[:60])
     )
 
+
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 IMAGE_SYSTEM = (
     "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
@@ -239,6 +177,7 @@ IMAGE_REFUSE = [
     "Ye wali image main nahi bana sakta bhai 🙅 kuch aur try kar!",
     "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
 ]
+
 
 @app.route("/image", methods=["POST"])
 def image():
@@ -269,15 +208,18 @@ def image():
         give_back(token)
         return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
 
+    # Pollinations ka free endpoint: browser seedha image load karta hai
     url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
         quote(prompt, safe=""),
         random.randint(1, 999999),
     )
     return jsonify({"url": url, "prompt": prompt})
 
+
 @app.route("/health")
 def health():
     return "ok", 200
+
 
 @app.route("/debug")
 def debug():
@@ -292,7 +234,6 @@ def debug():
         "Key length: %d" % len(API_KEY),
         "Text models: %s" % ", ".join(TEXT_MODELS),
         "Vision models: %s" % ", ".join(VISION_MODELS),
-        "Modes: %s" % ", ".join(MODES),
         "",
     ]
     if client is None:
@@ -322,14 +263,13 @@ def debug():
         lines.extend(f.result() for f in futs)
     return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
-    mode = get_mode(data.get("mode"))   # normal / roast / study / shayari
-    roast_style = get_roast_style(data.get("roast"))   # hinglish / haryanvi (sirf roast mode me)
     message = message.strip()[:1000] if isinstance(message, str) else ""
 
     if image is not None:
@@ -343,7 +283,7 @@ def chat():
         message = "Is file mein kya hai? Short mein batao."
 
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
-        return jsonify({"reply": BOSS_REPLY, "mode": mode})
+        return jsonify({"reply": BOSS_REPLY})
 
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
@@ -365,11 +305,10 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    messages = [{"role": "system", "content": build_system_prompt(mode, roast_style)}] + clean_history(data.get("history")) + [user_msg]
-    max_tokens = 1500 if image else MODES[mode]["max_tokens"]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
 
     try:
-        return jsonify({"reply": complete(models, messages, max_tokens), "mode": mode})
+        return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
     except RateLimitError:
         give_back(token)
         return jsonify({"reply": RATE_LIMIT_REPLY, "fallback": True, "err": "RateLimitError"})
@@ -377,6 +316,7 @@ def chat():
         app.logger.exception("Groq call failed")
         give_back(token)
         return jsonify({"reply": random.choice(FALLBACKS), "fallback": True, "err": type(e).__name__})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
