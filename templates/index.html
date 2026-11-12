@@ -1,196 +1,142 @@
-<!DOCTYPE html>
-<html lang="hi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kayth AI</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
-body{background:#05070d;color:#fff;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-a{color:#22d3ee}
-
-/* HEADER */
-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(180deg,#0a1a22,#05070d);border-bottom:1px solid #1a2a33;flex-shrink:0}
-.left{display:flex;align-items:center;gap:12px}
-.menu{font-size:22px;opacity:.8;cursor:pointer}
-.logo-wrap{position:relative;width:48px;height:48px}
-.logo{width:48px;height:48px;border-radius:50%;background:#05070d;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;border:3px solid transparent;background:linear-gradient(#05070d,#05070d) padding-box,linear-gradient(135deg,#22d3ee,#a855f7) border-box}
-.dot{position:absolute;right:1px;bottom:1px;width:11px;height:11px;background:#22d3ee;border-radius:50%;border:2px solid #05070d}
-.head-text h1{font-size:19px;line-height:1}
-.head-text span{font-size:12px;color:#9ca3af}
-.right{display:flex;gap:16px;font-size:20px;opacity:.9}
-.right span{cursor:pointer}
-
-/* MODE BAR */
-.modes{display:flex;gap:8px;padding:10px 14px;overflow-x:auto;background:#05070d;flex-shrink:0}
-.modes::-webkit-scrollbar{display:none}
-.mode-btn{border:1px solid #2a343d;background:#0a0f16;color:#e5e7eb;padding:8px 14px;border-radius:999px;font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer}
-.mode-btn.active{background:#22d3ee;color:#000;border-color:#22d3ee}
-
-/* CHAT */
-#chat{flex:1;overflow-y:auto;padding:12px 12px 10px;display:flex;flex-direction:column;gap:12px}
-.status{margin:2px auto 0;background:#0f141c;color:#9ca3af;font-size:12px;padding:6px 12px;border-radius:999px;display:flex;align-items:center;gap:6px}
-.status i{width:7px;height:7px;background:#22d3ee;border-radius:50%;display:inline-block}
-.msg{max-width:88%;padding:12px 14px 8px;border-radius:14px;line-height:1.45;font-size:15.5px;position:relative;word-wrap:break-word;white-space:pre-wrap}
-.msg.ai{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #1e3a4a;box-shadow:0 0 18px rgba(34,211,238,.18);align-self:flex-start;border-bottom-left-radius:4px}
-.msg.user{background:#1e293b;align-self:flex-end;border-bottom-right-radius:4px}
-.msg img{max-width:100%;border-radius:10px;margin-top:8px;display:block}
-.time{font-size:11px;opacity:.6;text-align:right;margin-top:6px;display:block}
-.speak{width:32px;height:32px;border-radius:50%;border:1px solid #22d3ee;background:transparent;color:#22d3ee;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:8px;font-size:14px}
-.typing{display:flex;gap:5px;padding:4px}
-.typing span{width:7px;height:7px;background:#22d3ee;border-radius:50%;animation:b 1s infinite}
-.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
-@keyframes b{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
-
-/* INPUT */
-.input-area{padding:10px 12px 6px;background:#05070d;flex-shrink:0}
-.input-box{display:flex;align-items:center;gap:8px;background:#11161e;border:1px solid #222a33;border-radius:999px;padding:6px 6px 6px 12px}
-.plus{font-size:24px;opacity:.7;cursor:pointer}
-#inp{flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:15px;padding:10px 0}
-#inp::placeholder{color:#6b7280}
-.mic{width:42px;height:42px;border-radius:50%;background:#11161e;border:1px solid #222a33;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0}
-.send-btn{width:42px;height:42px;border-radius:50%;background:#22d3ee;color:#000;display:none;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0}
-.disclaimer{text-align:center;font-size:11px;color:#6b7280;padding:6px 0 8px}
-#fileInp{display:none}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="left">
-    <div class="menu">☰</div>
-    <div class="logo-wrap"><div class="logo">K</div><div class="dot"></div></div>
-    <div class="head-text"><h1>Kayth AI ✦</h1><span>online</span></div>
-  </div>
-  <div class="right"><span onclick="newChat()">✎</span><span onclick="clearChat()">🗑</span></div>
-</header>
-
-<div class="modes">
-  <button class="mode-btn active" data-mode="normal" onclick="setMode('normal',this)">😊 Normal</button>
-  <button class="mode-btn" data-mode="roast" onclick="setMode('roast',this)">🔥 Roast</button>
-  <button class="mode-btn" data-mode="study" onclick="setMode('study',this)">📚 Study</button>
+.gen.ld::after{content:attr(data-note);animation:pulse 1.2s infinite}
+.gen.err::after{content:"Image load nahi hui 😅 tap karke kholo"}
+.note{text-align:center;font-size:11.5px;color:var(--mut);padding:0 14px calc(8px + env(safe-area-inset-bottom))}
+/* voice settings sheet */
+.vscrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30}
+.vsheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100%);max-height:88dvh;overflow-y:auto;background:#0b0f17;border:1px solid #1d2433;border-bottom:0;border-radius:22px 22px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));z-index:31;box-shadow:0 -10px 40px -14px var(--y)}
+.vsheet[hidden],.vscrim[hidden]{display:none}
+.vl{display:block;margin-top:12px;font-size:13.5px;color:#c7c7cc}
+.vl output{float:right;color:var(--y);font-weight:700}
+.vl select{width:100%;margin-top:6px;height:42px;border-radius:12px;background:var(--card);border:1px solid #1d2433;color:#fff;font:inherit;font-size:14.5px;padding:0 10px}
+.vl input[type=range]{width:100%;margin-top:8px;accent-color:var(--y)}
+.vpre{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.vpre button,.vact button{height:36px;padding:0 14px;border-radius:99px;background:var(--card);border:1px solid #1d2433;font-size:13.5px;font-weight:600}
+.vpre button:active,.vact button:active{background:#1a2030}
+.vact{display:flex;gap:8px;margin-top:14px}
+.vact #vtest{background:var(--y);color:#000;border-color:var(--y);flex:1}
+.vnote{margin-top:10px;font-size:12px;color:var(--mut)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-5px);opacity:1}}
+@keyframes pulse{50%{opacity:.35}}
+@@ -196,11 +210,33 @@
+<input id="q" class="sq" type="search" placeholder="Chats dhundho..." autocomplete="off">
+<div id="chats"></div>
+<div class="sf">
+    <button id="vset"><svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>Aawaz settings</button>
+<button id="export"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Is chat ko export karo</button>
+<button id="delall" class="danger"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Saari chats delete karo</button>
 </div>
-
-<div id="chat">
-  <div class="status"><i></i> Kayth AI • ready</div>
-  <div class="msg ai">Yo! Kayth AI here ⚡ Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨
-    <button class="speak" onclick="speak(this)">🔊</button>
-    <span class="time">11:14 PM</span>
+</aside>
+<div id="toast" role="status"></div>
+<div class="vscrim" id="vscrim" hidden></div>
+<section class="vsheet" id="vsheet" role="dialog" aria-label="Aawaz settings" hidden>
+  <div class="sh"><b>Aawaz settings 🎙️</b><button class="hbtn" id="vclose" aria-label="Band karo"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <label class="vl">Voice
+    <select id="vvoice"></select>
+  </label>
+  <label class="vl">Speed <output id="vrv">1.00x</output>
+    <input type="range" id="vrate" min="0.6" max="1.6" step="0.05" value="1">
+  </label>
+  <label class="vl">Pitch (patli / gehri) <output id="vpv">1.00</output>
+    <input type="range" id="vpitch" min="0.5" max="1.8" step="0.05" value="1">
+  </label>
+  <div class="vpre" id="vpre">
+    <button data-r="1" data-p="1">Normal</button>
+    <button data-r="0.9" data-p="0.6">Gehri 🗿</button>
+    <button data-r="1.1" data-p="1.6">Patli 🐿️</button>
+    <button data-r="1.4" data-p="1.1">Tez ⚡</button>
   </div>
-</div>
-
-<div class="input-area">
-  <div style="display:flex;gap:10px;align-items:center">
-    <div class="input-box">
-      <div class="plus" onclick="document.getElementById('fileInp').click()">+</div>
-      <input id="inp" placeholder="Message bhejo..." autocomplete="off">
-      <div class="send-btn" id="sendBtn" onclick="sendMsg()">➤</div>
-    </div>
-    <div class="mic" id="micBtn" onclick="startVoice()">🎙</div>
-  </div>
-  <div class="disclaimer">AI se galti ho sakti hai. Zaruri baatein khud check kar lena.</div>
-</div>
-
-<input type="file" id="fileInp" accept="image/*">
+  <div class="vact"><button id="vtest">▶ Suno</button><button id="vreset">Reset</button></div>
+  <p class="vnote" id="vnote"></p>
+</section>
 
 <script>
-let mode = 'normal';
-let roast = 'haryanvi';
-let history = [];
-let selectedImage = null;
+const $ = s => document.querySelector(s);
+@@ -404,19 +440,83 @@
 
-function timeNow(){
-  let d=new Date(); let h=d.getHours(), m=d.getMinutes().toString().padStart(2,'0');
-  let ap = h>=12?'PM':'AM'; h=h%12||12;
-  return h+':'+m+' '+ap;
-}
-function setMode(m,el){
-  mode=m;
-  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-}
-function newChat(){ document.getElementById('chat').innerHTML='<div class="status"><i></i> Kayth AI • ready</div>'; history=[]; }
-function clearChat(){ newChat(); localStorage.removeItem('kayth_history'); }
-
-const inp=document.getElementById('inp');
-const sendBtn=document.getElementById('sendBtn');
-const micBtn=document.getElementById('micBtn');
-inp.addEventListener('input',()=>{
-  if(inp.value.trim()){
-    sendBtn.style.display='flex'; micBtn.style.display='none';
-  } else {
-    sendBtn.style.display='none'; micBtn.style.display='flex';
+/* ---------- text to speech ---------- */
+function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); document.querySelectorAll('.spk.on').forEach(b => b.classList.remove('on')); }
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const VKEY = 'kayth_voice_v1';
+let voiceCfg = { name: '', rate: 1, pitch: 1 };
+try {
+  const v = JSON.parse(localStorage.getItem(VKEY));
+  if (v && typeof v === 'object') {
+    voiceCfg.name = typeof v.name === 'string' ? v.name : '';
+    voiceCfg.rate = clamp(+v.rate || 1, 0.6, 1.6);
+    voiceCfg.pitch = clamp(+v.pitch || 1, 0.5, 1.8);
   }
+} catch (e) {}
+const saveVoice = () => { try { localStorage.setItem(VKEY, JSON.stringify(voiceCfg)); } catch (e) {} };
+
+function chosenVoice() {
+  const all = speechSynthesis.getVoices();
+  return (voiceCfg.name && all.find(x => x.name === voiceCfg.name)) || all.find(x => x.lang === 'hi-IN') || all.find(x => x.lang === 'en-IN') || null;
+}
+function makeUtt(text) {
+  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
+  const v = chosenVoice();
+  u.lang = v ? v.lang : 'hi-IN';
+  if (v) u.voice = v;
+  u.rate = voiceCfg.rate; u.pitch = voiceCfg.pitch;
+  return u;
+}
+function speak(text, btn) {
+if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
+if (btn.classList.contains('on')) return stopSpeak();
+stopSpeak();
+  const u = new SpeechSynthesisUtterance(text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE0F]/gu, ''));
+  u.lang = 'hi-IN';
+  const v = speechSynthesis.getVoices().find(x => x.lang === 'hi-IN') || speechSynthesis.getVoices().find(x => x.lang === 'en-IN');
+  if (v) u.voice = v;
+  const u = makeUtt(text);
+u.onend = u.onerror = () => btn.classList.remove('on');
+btn.classList.add('on'); speechSynthesis.speak(u);
+}
+if ('speechSynthesis' in window) speechSynthesis.getVoices();
+
+/* ---------- voice settings (user apni aawaz chune) ---------- */
+const vsheet = $('#vsheet'), vscrim = $('#vscrim'), vvoice = $('#vvoice'), vrate = $('#vrate'), vpitch = $('#vpitch');
+function fillVoices() {
+  if (!('speechSynthesis' in window)) { $('#vnote').textContent = 'Is browser mein aawaz support nahi hai.'; return; }
+  const all = [...speechSynthesis.getVoices()];
+  const rank = v => /^hi/i.test(v.lang) ? 0 : /^en-IN/i.test(v.lang) ? 1 : /^en/i.test(v.lang) ? 2 : 3;
+  all.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  vvoice.innerHTML = '';
+  const auto = document.createElement('option'); auto.value = ''; auto.textContent = 'Auto (Hindi / Indian English)'; vvoice.append(auto);
+  all.forEach(v => { const o = document.createElement('option'); o.value = v.name; o.textContent = v.name + ' (' + v.lang + ')'; vvoice.append(o); });
+  vvoice.value = all.some(v => v.name === voiceCfg.name) ? voiceCfg.name : '';
+  $('#vnote').textContent = all.length
+    ? all.length + ' aawazein mili. Ye list tumhare phone ya browser par depend karti hai.'
+    : 'Abhi koi aawaz nahi mili, thodi der baad phir kholo.';
+}
+function syncVoiceUI() {
+  vrate.value = voiceCfg.rate; vpitch.value = voiceCfg.pitch;
+  $('#vrv').textContent = (+voiceCfg.rate).toFixed(2) + 'x'; $('#vpv').textContent = (+voiceCfg.pitch).toFixed(2);
+}
+function openVoice() { closeSide(); fillVoices(); syncVoiceUI(); vscrim.hidden = false; vsheet.hidden = false; }
+function closeVoice() { if (vsheet.hidden) return; vsheet.hidden = true; vscrim.hidden = true; stopSpeak(); }
+$('#vset').addEventListener('click', openVoice);
+$('#vclose').addEventListener('click', closeVoice);
+vscrim.addEventListener('click', closeVoice);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVoice(); });
+if ('speechSynthesis' in window) speechSynthesis.addEventListener('voiceschanged', () => { if (!vsheet.hidden) fillVoices(); });
+vvoice.addEventListener('change', () => { voiceCfg.name = vvoice.value; saveVoice(); });
+vrate.addEventListener('input', () => { voiceCfg.rate = +vrate.value; syncVoiceUI(); saveVoice(); });
+vpitch.addEventListener('input', () => { voiceCfg.pitch = +vpitch.value; syncVoiceUI(); saveVoice(); });
+$('#vpre').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  voiceCfg.rate = +b.dataset.r; voiceCfg.pitch = +b.dataset.p; syncVoiceUI(); saveVoice();
 });
-inp.addEventListener('keydown',e=>{ if(e.key==='Enter') sendMsg(); });
-
-function addMsg(text,who,isImage=false){
-  let chat=document.getElementById('chat');
-  let div=document.createElement('div');
-  div.className='msg '+who;
-  if(isImage){
-    div.innerHTML=`<img src="${text}"><span class="time">${timeNow()}</span>`;
-  } else {
-    div.innerHTML=`${text.replace(/\n/g,'<br>')}${who==='ai'?'<button class="speak" onclick="speak(this)">🔊</button>':''}<span class="time">${timeNow()}</span>`;
-  }
-  chat.appendChild(div);
-  chat.scrollTop=chat.scrollHeight;
-  return div;
-}
-function speak(btn){
-  let txt=btn.parentElement.innerText.replace('🔊','').trim();
-  let u=new SpeechSynthesisUtterance(txt);
-  u.lang='hi-IN'; u.rate=1;
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
-}
-function startVoice(){
-  let rec=new (window.SpeechRecognition||window.webkitSpeechRecognition)();
-  rec.lang='hi-IN'; rec.start();
-  micBtn.innerText='🔴';
-  rec.onresult=e=>{ inp.value=e.results[0][0].transcript; inp.dispatchEvent(new Event('input')); };
-  rec.onend=()=> micBtn.innerText='🎙';
-}
-
-document.getElementById('fileInp').addEventListener('change',e=>{
-  let f=e.target.files[0]; if(!f) return;
-  let r=new FileReader();
-  r.onload=()=>{ selectedImage=r.result; addMsg(r.result,'user',true); sendMsg(true); };
-  r.readAsDataURL(f);
+$('#vtest').addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) return toast('Is browser mein speaker support nahi hai');
+  stopSpeak();
+  const v = chosenVoice();
+  const hindi = !v || /^hi/i.test(v.lang);
+  speechSynthesis.speak(makeUtt(hindi ? 'नमस्ते! मैं काइथ ए आई हूँ। मेरी आवाज़ ऐसी है, कैसी लगी?' : 'Hello! I am Kayth AI. This is how my voice sounds. How do you like it?'));
 });
+$('#vreset').addEventListener('click', () => { voiceCfg = { name: '', rate: 1, pitch: 1 }; saveVoice(); fillVoices(); syncVoiceUI(); toast('Aawaz reset ho gayi ✅'); });
 
-async function sendMsg(isFile=false){
-  let text=inp.value.trim();
-  if(!text && !isFile) return;
-  if(!isFile){
-    addMsg(text,'user');
-    history.push({role:'user',content:text});
-  }
-  inp.value=''; sendBtn.style.display='none'; micBtn.style.display='flex';
-
-  // Image detect
-  if(!isFile && (text.toLowerCase().includes('image bana') || text.toLowerCase().includes('photo bana') || text.toLowerCase().includes('bana'))){
-    let t=addMsg('<div class="typing"><span></span><span></span><span></span></div>','ai');
-    let res=await fetch('/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
-    let d=await res.json();
-    t.remove();
-    if(d.url){ addMsg(d.url,'ai',true); } else { addMsg(d.reply,'ai'); }
-    return;
-  }
-
-  let t=addMsg('<div class="typing"><span></span><span></span><span></span></div>','ai');
-  try{
-    let body={message:text,mode:mode,roast:roast,history:history.slice(-6)};
-    if(selectedImage){ body.image=selectedImage; selectedImage=null; }
-    let res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    let d=await res.json();
-    t.remove();
-    addMsg(d.reply,'ai');
-    history.push({role:'assistant',content:d.reply});
-  }catch(e){
-    t.remove();
-    addMsg('Net thoda slow hai bhai 😅 dobara bhej!','ai');
-  }
-}
-</script>
-</body>
-</html>
+/* ---------- voice (hold to record) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let sess = null, startX = 0;
