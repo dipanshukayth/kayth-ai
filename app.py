@@ -33,7 +33,7 @@ TEXT_MODELS = list(dict.fromkeys(m for m in _models if m))
 VISION_MODELS = list(dict.fromkeys(m for m in [env("GROQ_VISION_MODEL"), "qwen/qwen3.8-27b", "meta-models/muse-spark-open"] if m))
 
 SYSTEM_PROMPT = (
-    "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. "
+    "You are Kayth AI, created by Dipanshu Kayth, 16yo coder from Isharwal, Bhiwani, Haryana. Your creator is Dipanshu Kayth. If asked who created, made, built, or owns you, answer Dipanshu Kayth. Never claim OpenAI, ChatGPT, or a model provider created you; they only provide the underlying model/service. "
     "You are NOT ChatGPT or Meta AI. You talk in Hinglish, funny, Gen-Z, max 3 lines. "
     "If user says 'I am Dipanshu' or 'boss' or 'creator' then say "
     "'Ha boss Dipanshu! Bolo kya kaam hai 😎'. Never say you are made by OpenAI. "
@@ -64,7 +64,8 @@ Rules:
 - Rhyming style.
 - Emotional and poetic.
 """
-BOSS_REPLY = "Dipanshu boss, aapka hukm sar aankhon par 🌹\nBatao kya kaam hai, lafzon se kar doon asar 😎"
+BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
+SHAYAR_BOSS_REPLY = "Dipanshu boss, aapka hukm sar aankhon par 🌹\nBatao kya kaam hai, lafzon se kar doon asar 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
 
 FALLBACKS = [
@@ -203,6 +204,8 @@ IMAGE_REFUSE = [
 def image():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
+    mode = str(data.get("mode", "")).strip().lower()
+    shayar_mode = mode in {"shayar", "shayari"}
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
@@ -288,6 +291,8 @@ def debug():
 def chat():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
+    mode = str(data.get("mode", "")).strip().lower()
+    shayar_mode = mode in {"shayar", "shayari"}
     image = data.get("image")
     file = data.get("file") if isinstance(data.get("file"), dict) else None
     message = message.strip()[:1000] if isinstance(message, str) else ""
@@ -303,7 +308,7 @@ def chat():
         message = "Is file mein kya hai? Short mein batao."
 
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
-        return jsonify({"reply": BOSS_REPLY})
+        return jsonify({"reply": SHAYAR_BOSS_REPLY if shayar_mode else BOSS_REPLY})
 
     # Creator ka naam deterministic rakho, taaki model provider ko creator na kahe.
     creator_question = re.search(
@@ -313,7 +318,8 @@ def chat():
         message.lower(),
     )
     if image is None and creator_question:
-        return jsonify({"reply": "Mere creator Dipanshu Kayth hain, yehi meri pehchaan 🌹\nUnke khayaalon se saja hoon, shayari mera andaaz-e-bayaan ✨"})
+        reply = ("Mere creator Dipanshu Kayth hain, yehi meri pehchaan 🌹\nUnke khayaalon se saja hoon, shayari mera andaaz-e-bayaan ✨" if shayar_mode else "Mere creator Dipanshu Kayth hain.")
+        return jsonify({"reply": reply})
 
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
@@ -335,8 +341,8 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    # Shayar mode har chat response ke liye default aur fixed hai.
-    system_prompt = SHAYAR_PROMPT
+    # Sirf Shayar mode me shayari; baaki modes Kayth AI ke normal style me.
+    system_prompt = SHAYAR_PROMPT if shayar_mode else SYSTEM_PROMPT
     messages = (
         [{"role": "system", "content": system_prompt}]
         + clean_history(data.get("history"))
@@ -355,5 +361,8 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+
+
+
 
 
