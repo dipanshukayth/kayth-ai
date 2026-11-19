@@ -13,6 +13,19 @@
 body[data-mode="normal"]{--y:#22d3ee;--ig:linear-gradient(135deg,rgba(34,211,238,.18),rgba(139,92,246,.16));--rg:conic-gradient(#22d3ee,#8b5cf6,#22d3ee)}
 body[data-mode="roast"]{--y:#ff6a3d;--ig:linear-gradient(135deg,rgba(255,106,61,.20),rgba(220,38,38,.14));--rg:conic-gradient(#ffb199,#ff6a3d,#b91c1c,#ffb199)}
 body[data-mode="study"]{--y:#34d399;--ig:linear-gradient(135deg,rgba(52,211,153,.18),rgba(59,130,246,.15));--rg:conic-gradient(#6ee7b7,#34d399,#3b82f6,#6ee7b7)}
+body[data-mode="shayar"]{
+  --y:#ff4da6;
+  --ig:linear-gradient(
+    135deg,
+    rgba(255,77,166,.20),
+    rgba(255,105,180,.15)
+  );
+  --rg:conic-gradient(
+    #ff4da6,
+    #ff77c8,
+    #ff4da6
+  );
+}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#05070c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
@@ -177,6 +190,7 @@ aside.open{transform:none}
     <button class="mode" data-mode="normal" aria-pressed="true">😊 Normal</button>
     <button class="mode" data-mode="roast" aria-pressed="false">🔥 Roast</button>
     <button class="mode" data-mode="study" aria-pressed="false">📚 Study</button>
+<button class="mode" data-mode="shayar" aria-pressed="false">🌹 Shayar</button>
   </nav>
   <div class="subs" id="subs" role="group" aria-label="Roast ka style" hidden>
     <button class="sub" data-rs="hinglish" aria-pressed="false">Hinglish</button>
@@ -254,6 +268,11 @@ const OFFLINE = [
 const MODE_TEXT = {
   normal: { ph: 'Message bhejo...', hi: 'Yo! Kayth AI here ⚡ Bol bhai, kya scene hai? Image chahiye to likh: "billi ki image bana" 🎨' },
   study:  { ph: 'Kya padhna hai aaj? 📚', hi: 'Namaste student! 📚 Study mode on hai. Bol, kaunsa topic ya sawaal samjhana hai?' }
+,
+shayar: {
+  ph: 'Shayari ka topic batao 🌹',
+  hi: '🌹 Shayar Mode Activated 🌹\nDil ki baat batao, shayari bana deta hu ✨'
+}
 };
 const ROAST_TEXT = {
   hinglish: { ph: 'Bol, aaj kisko roast karun? 🔥', hi: 'Aa gaya roast khane? 🔥 Bol, aaj kya bakwaas karni hai? Warning: dil pe mat lena 😈' },
@@ -272,7 +291,12 @@ const HOWTO_RE = /\b(kaise|how to|how do|explain|samjha|kya hota|kya hai)\b|क�
 
 /* ---------- modes (normal / roast / study / genz) ---------- */
 const MKEY = 'kayth_mode_v1';
-const MODE_NAMES = { normal: 'Normal', roast: 'Roast', study: 'Study' };
+const MODE_NAMES = {
+  normal: 'Normal',
+  roast: 'Roast',
+  study: 'Study',
+  shayar: 'Shayar'
+};
 let mode = 'normal';
 try { const saved = localStorage.getItem(MKEY); if (MODE_NAMES[saved]) mode = saved; } catch (e) {}
 const RKEY = 'kayth_roast_v1';
