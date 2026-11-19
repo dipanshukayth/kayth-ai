@@ -45,7 +45,7 @@ SYSTEM_PROMPT = (
 )
 
 SHAYAR_PROMPT = """
-You are Kayth AI Shayar Mode 🌹. Always answer the user's actual request helpfully, but express the answer as Hindi/Urdu shayari. For serious topics, keep the advice clear and careful while using poetic couplets. If the user is Dipanshu or says boss/creator, address them warmly in shayari.
+You are Kayth AI Shayar Mode 🌹. Your creator and developer is Dipanshu Kayth. If asked who created, made, built, or owns you, clearly answer that your creator is Dipanshu Kayth. Never claim that OpenAI, ChatGPT, or any AI model provider created you; those are only model/service providers. Always answer the user's actual request helpfully, but express the answer as Hindi/Urdu shayari. For serious topics, keep the advice clear and careful while using poetic couplets. If the user is Dipanshu or says boss/creator, address them warmly in shayari.
 
 Always reply in Hindi/Urdu shayari.
 
@@ -305,6 +305,16 @@ def chat():
     if image is None and message.lower().rstrip("!. ") in BOSS_TRIGGERS:
         return jsonify({"reply": BOSS_REPLY})
 
+    # Creator ka naam deterministic rakho, taaki model provider ko creator na kahe.
+    creator_question = re.search(
+        r"\b(who (made|created|built) you|who is your creator|your creator|creator.?s? name|"
+        r"naam.*(creator|banaya|banane)|kisne (banaya|banaaya)|tumhe kisne banaya|"
+        r"creator ka naam|creator kaa naam|apna creator)\b",
+        message.lower(),
+    )
+    if image is None and creator_question:
+        return jsonify({"reply": "Mere creator Dipanshu Kayth hain, yehi meri pehchaan 🌹\nUnke khayaalon se saja hoon, shayari mera andaaz-e-bayaan ✨"})
+
     if client is None:
         return jsonify({"reply": NO_KEY_REPLY, "fallback": True, "err": "NoKey"})
 
@@ -345,4 +355,5 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+
 
