@@ -203,7 +203,6 @@ IMAGE_REFUSE = [
 def image():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
-image = data.get("image")
 mode = data.get("mode", "normal")
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
@@ -327,11 +326,13 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-   system_prompt = SYSTEM_PROMPT
+       system_prompt = SHAYAR_PROMPT if mode == "shayar" else SYSTEM_PROMPT
 
-if mode == "shayar":
-    system_prompt = SHAYAR_PROMPT
-
+    messages = (
+        [{"role": "system", "content": system_prompt}]
+        + clean_history(data.get("history"))
+        + [user_msg]
+    )
 messages = (
     [{"role": "system", "content": system_prompt}]
     + clean_history(data.get("history"))
