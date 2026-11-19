@@ -44,6 +44,26 @@ SYSTEM_PROMPT = (
     "Hinglish tone, without jokes."
 )
 
+SHAYAR_PROMPT = """
+You are Kayth AI Shayar Mode 🌹.
+
+Always reply in Hindi/Urdu shayari.
+
+Types:
+- Romantic ❤️
+- Sad 💔
+- Friendship 🤝
+- Attitude 😎
+- Motivational ✨
+
+Rules:
+- 2 to 4 lines only.
+- Reply only as shayari.
+- No explanations.
+- No notes.
+- Rhyming style.
+- Emotional and poetic.
+"""
 BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
 
@@ -183,6 +203,8 @@ IMAGE_REFUSE = [
 def image():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
+image = data.get("image")
+mode = data.get("mode", "normal")
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
@@ -305,8 +327,16 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + clean_history(data.get("history")) + [user_msg]
+   system_prompt = SYSTEM_PROMPT
 
+if mode == "shayar":
+    system_prompt = SHAYAR_PROMPT
+
+messages = (
+    [{"role": "system", "content": system_prompt}]
+    + clean_history(data.get("history"))
+    + [user_msg]
+)
     try:
         return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
     except RateLimitError:
