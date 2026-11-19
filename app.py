@@ -45,7 +45,7 @@ SYSTEM_PROMPT = (
 )
 
 SHAYAR_PROMPT = """
-You are Kayth AI Shayar Mode 🌹.
+You are Kayth AI Shayar Mode 🌹. Always answer the user's actual request helpfully, but express the answer as Hindi/Urdu shayari. For serious topics, keep the advice clear and careful while using poetic couplets. If the user is Dipanshu or says boss/creator, address them warmly in shayari.
 
 Always reply in Hindi/Urdu shayari.
 
@@ -64,7 +64,7 @@ Rules:
 - Rhyming style.
 - Emotional and poetic.
 """
-BOSS_REPLY = "Ha boss Dipanshu! Bolo kya kaam hai 😎"
+BOSS_REPLY = "Dipanshu boss, aapka hukm sar aankhon par 🌹\nBatao kya kaam hai, lafzon se kar doon asar 😎"
 BOSS_TRIGGERS = {"boss", "creator", "i am dipanshu", "i am dipanshu kayth", "main dipanshu hu", "main dipanshu hoon"}
 
 FALLBACKS = [
@@ -203,7 +203,6 @@ IMAGE_REFUSE = [
 def image():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
-mode = data.get("mode", "normal")
     if not isinstance(message, str) or not message.strip():
         return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
     message = message.strip()[:500]
@@ -326,18 +325,13 @@ def chat():
         user_msg = {"role": "user", "content": message + (file_note(file) if file else "")}
         models = TEXT_MODELS
 
-       system_prompt = SHAYAR_PROMPT if mode == "shayar" else SYSTEM_PROMPT
-
+    # Shayar mode har chat response ke liye default aur fixed hai.
+    system_prompt = SHAYAR_PROMPT
     messages = (
         [{"role": "system", "content": system_prompt}]
         + clean_history(data.get("history"))
         + [user_msg]
     )
-messages = (
-    [{"role": "system", "content": system_prompt}]
-    + clean_history(data.get("history"))
-    + [user_msg]
-)
     try:
         return jsonify({"reply": complete(models, messages, 1500 if image else 600)})
     except RateLimitError:
@@ -351,3 +345,4 @@ messages = (
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+
