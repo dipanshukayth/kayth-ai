@@ -2,6 +2,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import os
+import json
 import random
 import re
 import threading
@@ -22,6 +23,10 @@ def env(name, default=""):
 
 
 API_KEY = env("GROQ_API_KEY")
+FAL_KEY = env("FAL_KEY")
+FAL_IMAGE_MODEL = env("FAL_IMAGE_MODEL", "fal-ai/flux-2/turbo")
+FAL_VIDEO_TEXT_MODEL = "fal-ai/wan/v2.7/text-to-video"
+FAL_VIDEO_IMAGE_MODEL = "fal-ai/wan/v2.7/image-to-video"
 DEBUG_KEY = env("DEBUG_KEY")   # /debug tabhi khulega jab ye set ho: /debug?k=<DEBUG_KEY>
 client = Groq(api_key=API_KEY) if API_KEY else None
 
@@ -126,6 +131,7 @@ LIMITS = {
     "chat": (int(env("LIMIT_CHAT_PER_MIN", "5")), int(env("LIMIT_CHAT_PER_DAY", "30"))),
     "photo": (int(env("LIMIT_PHOTO_PER_MIN", "1")), int(env("LIMIT_PHOTO_PER_DAY", "3"))),
     "image": (int(env("LIMIT_IMAGE_PER_MIN", "3")), int(env("LIMIT_IMAGE_PER_DAY", "10"))),
+    "video": (int(env("LIMIT_VIDEO_PER_MIN", "1")), int(env("LIMIT_VIDEO_PER_DAY", "2"))),
 }
 LIMIT_MSG = {
     "chat": ("Thoda dheere bhai 😅 1 minute mein itne messages nahi chalte, thodi der ruk ke bhej.",
@@ -134,6 +140,8 @@ LIMIT_MSG = {
               "Aaj ke free photo-checks khatam 📸 kal phir bhej!"),
     "image": ("Itni jaldi nahi bhai 🎨 thodi der baad phir bol.",
               "Aaj ki free images khatam 🎨 kal phir bana dunga!"),
+    "video": ("Video queue busy hai 🎬 ek minute baad try kar.",
+              "Aaj ke video generations khatam 🎬 kal phir try kar!"),
 }
 _hits = defaultdict(deque)
 _lock = threading.Lock()
@@ -189,27 +197,36 @@ def home():
     return render_template("index.html")
 
 
-IMAGE_SYSTEM = (
-    "Turn the user's request into ONE vivid English image-generation prompt, max 40 words "
-    "(subject, style, lighting, mood). Output ONLY the prompt, no quotes, no extra words. "
-    "If the request is sexual, gory/violent, or depicts a real named person, output exactly: REFUSE"
-)
+IMAGE_SYSTEM = """
+Create a detailed, model-ready image prompt in English from the user's idea. Preserve every requested subject, setting, action, and any exact text. Specify a clear composition and camera framing, distinctive visual style, realistic lighting, color palette, material/texture detail, background, and mood. Make it vivid and coherent, around 60-100 words. Do not add unrelated objects or change the subject. For text in the image, quote the exact words and say they must be legible. If the request is sexual, graphic violence, or a real named person's likeness, output exactly REFUSE.
+"""
 IMAGE_REFUSE = [
     "Ye wali image main nahi bana sakta bhai 🙅 kuch aur try kar!",
     "Arre isme panga hai 😅 koi aur idea de, wo bana dunga!",
 ]
 
 
+def fal_json(url, payload=None, timeout=90):
+    if not FAL_KEY:
+        raise RuntimeError("FAL_KEY is not configured")
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Authorization": "Key " + FAL_KEY, "Content-Type": "application/json"},
+        method="POST" if payload is not None else "GET",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 @app.route("/image", methods=["POST"])
 def image():
     data = request.get_json(silent=True) or {}
     message = data.get("message")
-    mode = str(data.get("mode", "")).strip().lower()
-    shayar_mode = mode in {"shayar", "shayari"}
     if not isinstance(message, str) or not message.strip():
-        return jsonify({"reply": "Kya banau bhai? Thoda describe to kar 🎨"}), 400
-    message = message.strip()[:500]
-
+        return jsonify({"reply": "Kya banau? Apna idea thoda detail mein likho 🎨"}), 400
+    message = message.strip()[:1000]
     ok, msg, token = hit("image")
     if not ok:
         return jsonify({"reply": msg, "limit": True})
@@ -220,25 +237,99 @@ def image():
             prompt = complete(
                 TEXT_MODELS,
                 [{"role": "system", "content": IMAGE_SYSTEM}, {"role": "user", "content": message}],
-                400,
-                10,
+                500,
+                15,
             )
         except Exception:
-            app.logger.exception("Image prompt rewrite failed")
-
-    prompt = " ".join(prompt.split()).strip("\"'")[:300]
+            app.logger.exception("Image prompt enhancement failed")
+    prompt = " ".join(prompt.split()).strip("\"'")[:1200]
     if not prompt or prompt.upper().startswith("REFUSE"):
         give_back(token)
         return jsonify({"reply": random.choice(IMAGE_REFUSE), "refused": True})
 
-    # Pollinations ka free endpoint: browser seedha image load karta hai
-    url = "https://image.pollinations.ai/prompt/%s?width=768&height=768&nologo=true&safe=true&seed=%d" % (
-        quote(prompt, safe=""),
-        random.randint(1, 999999),
+    if FAL_KEY:
+        try:
+            result = fal_json("https://fal.run/%s" % FAL_IMAGE_MODEL, {
+                "prompt": prompt,
+                "image_size": "square_hd",
+                "num_images": 1,
+                "enable_prompt_expansion": True,
+                "enable_safety_checker": True,
+                "output_format": "png",
+            })
+            images = result.get("images") or []
+            if images and images[0].get("url"):
+                return jsonify({"url": images[0]["url"], "prompt": result.get("prompt") or prompt, "model": FAL_IMAGE_MODEL})
+            raise RuntimeError("Image provider returned no image")
+        except Exception as e:
+            app.logger.exception("Fal image generation failed")
+            give_back(token)
+            return jsonify({"reply": "Image provider se image nahi ban payi 😕 thodi der baad try karo.", "err": type(e).__name__}), 502
+
+    url = "https://image.pollinations.ai/prompt/%s?width=1024&height=1024&nologo=true&safe=true&seed=%d" % (
+        quote(prompt, safe=""), random.randint(1, 999999),
     )
-    return jsonify({"url": url, "prompt": prompt})
+    return jsonify({"url": url, "prompt": prompt, "model": "pollinations-fallback"})
 
 
+@app.route("/video", methods=["POST"])
+def video():
+    if not FAL_KEY:
+        return jsonify({"reply": "AI video ke liye Render mein FAL_KEY secret set karna hoga 🎬"}), 503
+    data = request.get_json(silent=True) or {}
+    message = data.get("message")
+    image = data.get("image")
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({"reply": "Video mein kya dikhana hai? /video ke baad idea likho 🎬"}), 400
+    message = message.strip()[:1000]
+    if image is not None and not (isinstance(image, str) and re.match(r"^data:image/(jpeg|jpg|png|webp);base64,", image) and len(image) < 6_000_000):
+        return jsonify({"reply": BAD_IMAGE_REPLY}), 400
+    ok, msg, token = hit("video")
+    if not ok:
+        return jsonify({"reply": msg, "limit": True})
+    model = FAL_VIDEO_IMAGE_MODEL if image else FAL_VIDEO_TEXT_MODEL
+    payload = {"prompt": message, "duration": 5, "resolution": "720p", "enable_prompt_expansion": True, "enable_safety_checker": True}
+    if image:
+        payload["image_url"] = image
+    else:
+        payload["aspect_ratio"] = "9:16"
+    try:
+        result = fal_json("https://queue.fal.run/%s" % model, payload, timeout=30)
+        request_id = result.get("request_id")
+        if not request_id:
+            raise RuntimeError("Video provider returned no request id")
+        return jsonify({"video_job": True, "request_id": request_id, "image_to_video": bool(image)})
+    except Exception as e:
+        app.logger.exception("Fal video submit failed")
+        give_back(token)
+        return jsonify({"reply": "Video request bhej nahi paya 😕 API key/billing check karke phir try karo.", "err": type(e).__name__}), 502
+
+
+@app.route("/video/status", methods=["POST"])
+def video_status():
+    if not FAL_KEY:
+        return jsonify({"reply": "AI video ke liye Render mein FAL_KEY secret set karna hoga 🎬"}), 503
+    data = request.get_json(silent=True) or {}
+    request_id = data.get("request_id")
+    if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,100}", request_id):
+        return jsonify({"reply": "Video request ID galat hai."}), 400
+    model = FAL_VIDEO_IMAGE_MODEL if data.get("image_to_video") else FAL_VIDEO_TEXT_MODEL
+    root = "https://queue.fal.run/%s/requests/%s" % (model, request_id)
+    try:
+        status = fal_json(root + "/status", timeout=25)
+        state = status.get("status", "")
+        if state == "COMPLETED":
+            result = fal_json(root, timeout=30)
+            url = (result.get("video") or {}).get("url")
+            if not url:
+                raise RuntimeError("Video provider returned no video URL")
+            return jsonify({"done": True, "url": url})
+        if state in {"FAILED", "CANCELLED"}:
+            return jsonify({"reply": "Video generate nahi ho paya 😕 koi aur prompt try karo.", "failed": True}), 502
+        return jsonify({"pending": True, "status": state or "IN_QUEUE"})
+    except Exception as e:
+        app.logger.exception("Fal video status failed")
+        return jsonify({"reply": "Video status check nahi ho paya 😕 thodi der baad try karo.", "err": type(e).__name__}), 502
 @app.route("/health")
 def health():
     return "ok", 200
@@ -253,6 +344,7 @@ def debug():
         return "Key galat hai. Link me ?k= ke baad wahi shabd likho jo DEBUG_KEY ki Value me hai.", 404
     lines = [
         "GROQ_API_KEY set: %s" % bool(API_KEY),
+        "FAL_KEY set: %s" % bool(FAL_KEY),
         "Key 'gsk_' se shuru: %s" % API_KEY.startswith("gsk_"),
         "Key length: %d" % len(API_KEY),
         "Text models: %s" % ", ".join(TEXT_MODELS),
@@ -361,6 +453,7 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+
 
 
 
