@@ -156,6 +156,7 @@ aside.open{transform:none}
 .gen{display:block;position:relative;width:min(100%,300px);aspect-ratio:1;border-radius:14px;overflow:hidden;background:rgba(0,0,0,.3);margin-bottom:6px}
 .b .gen img{width:100%;height:100%;max-height:none;object-fit:cover;margin:0;border-radius:0;opacity:0;transition:opacity .3s}
 .gen:not(.ld):not(.err) img{opacity:1}
+.b video.gen-video{display:block;width:min(100%,320px);max-height:360px;border-radius:14px;margin-bottom:6px;background:#000}
 .gen.ld::after,.gen.err::after{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:12px;font-size:14px}
 .gen.ld::after{content:attr(data-note);animation:pulse 1.2s infinite}
 .gen.err::after{content:"Image load nahi hui 😅 tap karke kholo"}
@@ -295,6 +296,9 @@ const modeText = m => m === 'roast' ? ROAST_TEXT[roastStyle] : MODE_TEXT[m];
 const isWelcomeMsg = m => m.r === 'assistant' && (m.w || [...Object.values(MODE_TEXT), ...Object.values(ROAST_TEXT)].some(x => x.hi === m.c));
 const IMG_LINES = ['Ye lo bhai, fresh fresh 🎨', 'Ban gayi! Kaisi lagi? 😎', 'Dipanshu ke AI ka kamaal 🎨🔥'];
 const SLASH_RE = /^\/(img|image|imagine)\b\s*/i;
+const VIDEO_SLASH_RE = /^\/(video|vid)\b\s*/i;
+const VIDEO_RE = /\b(video|clip|animation)\b/i;
+const VIDEO_VERB_RE = /\b(bana|banao|banado|bnao|create|make|generate|animate)\b/i;
 const IMG_WORDS = '(images?|imgs?|photos?|pics?|pictures?|tasveer|tasvir|logo|wallpaper|poster)';
 const IMG_VERBS = '(bana|banao|banado|banaye|banaiye|banana|bna|bnao|bnado|bnaye|bnaiye|bnana|bnai|bnayi|banai|banayi|bnadi|banadi|generate|create|draw|make|dikha|dikhao|dikhado)';
 const IMG_RE = new RegExp(IMG_WORDS + '\\b.*\\b' + IMG_VERBS + '\\b|\\b' + IMG_VERBS + '\\b.*\\b' + IMG_WORDS + '\\b', 'i');
@@ -400,7 +404,9 @@ function add(m, state) {
     if (m.img) { const im = document.createElement('img'); im.src = m.img; im.alt = 'Photo'; b.append(im); }
     else if (!m.c) t.textContent = '📷 Photo';
   }
-  if (m.gen) {
+  if (m.gen && m.gen.video) {
+    const v = document.createElement('video'); v.className = 'gen-video'; v.src = m.gen.video; v.controls = true; v.playsInline = true; v.preload = 'metadata'; v.setAttribute('aria-label', 'AI generated video'); b.append(v);
+  } else if (m.gen) {
     const w = document.createElement('a'); w.className = 'gen ld'; w.href = m.gen.url; w.target = '_blank'; w.rel = 'noopener';
     const im = document.createElement('img'); im.alt = m.gen.prompt || 'Generated image'; w.append(im); b.append(w);
     let tries = 0;
@@ -446,6 +452,7 @@ function showTyping(on, label) {
 async function send(text) {
   text = (text || '').trim();
   if (SLASH_RE.test(text) && !text.replace(SLASH_RE, '').trim()) return toast('Kya banau? /image ke baad likho 🎨');
+  if (VIDEO_SLASH_RE.test(text) && !text.replace(VIDEO_SLASH_RE, '').trim()) return toast('Video ka idea bhi likho, jaise /video samundar ke upar udta dragon 🎬');
   const image = pendingImg, att = pendingFile;
   if ((!text && !image && !att) || busy) return;
   busy = true; msg.value = ''; clearImg(); stopSpeak();
@@ -453,15 +460,34 @@ async function send(text) {
   const um = { r: 'user', c: text, t: Date.now(), p: !!image, img: image, f: att ? { name: att.name, size: att.size } : undefined };
   chat.push(um); const tk = add(um, 'sent'); save();
   setTimeout(() => setTicks(tk, 'delivered'), 350);
-  const imgReq = !image && !att && (SLASH_RE.test(text) || ((IMG_RE.test(text) || DEV_RE.test(text) || DRAW_RE.test(text)) && !HOWTO_RE.test(text)));
-  showTyping(true, imgReq ? 'Kayth AI is drawing' : '');
+  const videoReq = !att && (VIDEO_SLASH_RE.test(text) || (VIDEO_RE.test(text) && VIDEO_VERB_RE.test(text)));
+  const imgReq = !videoReq && !image && !att && (SLASH_RE.test(text) || ((IMG_RE.test(text) || DEV_RE.test(text) || DRAW_RE.test(text)) && !HOWTO_RE.test(text)));
+  showTyping(true, videoReq ? 'Kayth AI is making a video' : imgReq ? 'Kayth AI is drawing' : '');
   const seenT = setTimeout(() => setTicks(tk, 'seen'), 900);
 
   let reply = '', gen = null;
   try {
-    const res = await fetch(imgReq ? '/image' : '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imgReq ? { message: text.replace(SLASH_RE, '') } : { message: text, history, image, file: att, mode, roast: roastStyle }) });
-    const d = await res.json(); reply = d.reply || ''; if (d.url) gen = { url: d.url, prompt: d.prompt || '' };
-    if (d.err) console.warn('Kayth AI error:', d.err);
+    const endpoint = videoReq ? "/video" : imgReq ? "/image" : "/chat";
+    const payload = videoReq
+      ? { message: text.replace(VIDEO_SLASH_RE, "").trim(), image }
+      : imgReq
+        ? { message: text.replace(SLASH_RE, "").trim() }
+        : { message: text, history, image, file: att, mode, roast: roastStyle };
+    const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    let d = await res.json();
+    reply = d.reply || "";
+    if (d.url) gen = { url: d.url, prompt: d.prompt || "" };
+    if (d.video_job) {
+      for (let i = 0; i < 120; i++) {
+        await sleep(2500);
+        const sr = await fetch("/video/status", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ request_id: d.request_id, image_to_video: d.image_to_video }) });
+        d = await sr.json();
+        if (d.done && d.url) { gen = { video: d.url }; reply = "Video ban gayi 🎬"; break; }
+        if (d.reply) { reply = d.reply; break; }
+      }
+      if (!gen) reply = reply || "Video abhi ready nahi hui 😕 dobara try karna.";
+    }
+    if (d.err) console.warn("Kayth AI error:", d.err);
   } catch (e) {}
   clearTimeout(seenT); setTicks(tk, 'seen');
   if (gen && !reply) reply = pick(IMG_LINES);
@@ -767,6 +793,7 @@ async function shareChat() {
     const content = m.c || (m.f ? '📎 ' + m.f.name : m.p ? '📷 Photo' : '');
     const extras = [];
     if (m.gen && m.gen.url) extras.push('🎨 ' + m.gen.url);
+    if (m.gen && m.gen.video) extras.push('🎬 ' + m.gen.video);
     if (m.p && m.img) extras.push('📷 ' + m.img);
     return who + ': ' + content + (extras.length ? '\n' + extras.join('\n') : '');
   }).join('\n\n');
@@ -840,5 +867,8 @@ setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
 <!-- End Cloudflare Web Analytics -->
 </body>
 </html>
+
+
+
 
 
