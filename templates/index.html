@@ -47,6 +47,11 @@ header{display:flex;align-items:center;gap:6px;padding:calc(10px + env(safe-area
 .who b{display:block;font-size:17px;font-weight:800;letter-spacing:-.3px}
 .who small{display:block;font-size:12.5px;color:var(--mut);margin-top:1px}
 .who small.on{color:var(--y)}
+.share-wrap{position:relative;flex:none}
+.share-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:25;min-width:160px;padding:6px;border:1px solid #1d2433;border-radius:14px;background:#111722;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.share-menu[hidden]{display:none}
+.share-menu button{display:block;width:100%;padding:10px 12px;border-radius:9px;text-align:left;white-space:nowrap;color:#fff;font-size:14px}
+.share-menu button:active{background:#252c39}
 .hbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#c7c7cc}
 .hbtn:active{background:#1c1c1e}
 body.busy .ring::before{animation:spin 1.1s linear infinite}
@@ -182,6 +187,13 @@ aside.open{transform:none}
     <button class="hbtn" id="menu" aria-label="Chats kholo"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
     <div class="story"><div class="ring"></div><div class="av">K</div><i class="dot" title="Online"></i></div>
     <div class="who"><b>Kayth AI ✦</b><small id="sub">online</small></div>
+    <div class="share-wrap">
+      <button class="hbtn" id="shareToggle" aria-label="Share options" title="Share"><svg class="i" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.7 6.8-4.4M8.6 13.3l6.8 4.4"/></svg></button>
+      <div class="share-menu" id="shareMenu" hidden>
+        <button type="button" id="shareChatOpt">Chat share karo</button>
+        <button type="button" id="shareSiteOpt">Site share karo</button>
+      </div>
+    </div>
     <button class="hbtn" id="newh" aria-label="Nayi chat"><svg class="i" viewBox="0 0 24 24"><path d="M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
     <button class="hbtn" id="clear" aria-label="Clear chat"><svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
   </header>
@@ -257,6 +269,7 @@ const $ = s => document.querySelector(s);
 const chatEl = $('#chat'), list = $('#list'), msg = $('#msg'), foot = $('#foot'), act = $('#act'),
       sub = $('#sub'), recbar = $('#recbar'), rt = $('#rt'), toastEl = $('#toast');
 const KEY = 'kayth_chat_v1';
+const APP_URL = 'https://kayth-ai-2.onrender.com';
 const ICON_SPK = '<svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
 const TICK1 = '<svg class="i" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 7"/></svg>';
 const TICK2 = '<svg class="i" viewBox="0 0 24 24"><path d="M1.5 12.5l5 5L17 7M10 16.5l1 1L22 7"/></svg>';
@@ -746,6 +759,68 @@ $('#delall').addEventListener('click', () => {
   clearImg(); renderChat(); persist(); renderSide(); closeSide();
 });
 
+async function shareChat() {
+  const msgs = chat.filter(m => !m.w);
+  if (!msgs.length) return toast('Share karne ke liye chat khaali hai');
+  const body = msgs.map(m => {
+    const who = m.r === 'user' ? 'Tum' : 'Kayth AI';
+    const content = m.c || (m.f ? '📎 ' + m.f.name : m.p ? '📷 Photo' : '');
+    const extras = [];
+    if (m.gen && m.gen.url) extras.push('🎨 ' + m.gen.url);
+    if (m.p && m.img) extras.push('📷 ' + m.img);
+    return who + ': ' + content + (extras.length ? '\n' + extras.join('\n') : '');
+  }).join('\n\n');
+  const payload = { title: cur().title || 'Kayth AI chat', text: 'Kayth AI · ' + (cur().title || 'Chat') + '\n\n' + body, url: APP_URL };
+  try {
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ title: payload.title, text: payload.text, url: payload.url }))) {
+      await navigator.share(payload);
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(payload.text + '\n\n' + payload.url);
+      return toast('Chat share text copy ho gaya ✅');
+    }
+    const box = document.createElement('textarea');
+    box.value = payload.text + '\n\n' + payload.url;
+    box.style.position = 'fixed'; box.style.opacity = '0';
+    document.body.append(box); box.select();
+    const copied = document.execCommand('copy'); box.remove();
+    if (copied) toast('Chat share text copy ho gaya ✅');
+    else prompt('Chat share text copy karo:', payload.text + '\n\n' + APP_URL);
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Share nahi ho paya, chat export karke bhejo');
+  }
+}
+const shareMenu = $('#shareMenu');
+$('#shareToggle').addEventListener('click', e => {
+  e.stopPropagation(); shareMenu.hidden = !shareMenu.hidden;
+});
+$('#shareChatOpt').addEventListener('click', () => { shareMenu.hidden = true; shareChat(); });
+$('#shareSiteOpt').addEventListener('click', () => { shareMenu.hidden = true; shareSite(); });
+document.addEventListener('click', e => { if (!e.target.closest('.share-wrap')) shareMenu.hidden = true; });
+async function shareSite() {
+  const payload = { title: 'Kayth AI ✦', text: 'Kayth AI try karo ✨', url: APP_URL };
+  try {
+    if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
+      await navigator.share(payload);
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(APP_URL);
+      return toast('Site link copy ho gaya ✅');
+    }
+    const box = document.createElement('textarea');
+    box.value = APP_URL; box.style.position = 'fixed'; box.style.opacity = '0';
+    document.body.append(box); box.select();
+    const copied = document.execCommand('copy'); box.remove();
+    if (copied) toast('Site link copy ho gaya ✅');
+    else prompt('Site link copy karo:', APP_URL);
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Site share nahi ho paya');
+  }
+}
+$('#shareSite').addEventListener('click', shareSite);
+$('#share').addEventListener('click', shareChat);
 $('#export').addEventListener('click', () => {
   if (!chat.length) return toast('Export karne ko kuch nahi hai');
   const text = chat.map(m => '[' + clock(m.t) + '] ' + (m.r === 'user' ? 'Tum' : 'Kayth AI') + ': ' + (m.c || (m.f ? '📎 ' + m.f.name : '📷 Photo'))).join('\n\n');
@@ -765,3 +840,5 @@ setTimeout(() => chatEl.scrollTo({ top: chatEl.scrollHeight }), 50);
 <!-- End Cloudflare Web Analytics -->
 </body>
 </html>
+
+
